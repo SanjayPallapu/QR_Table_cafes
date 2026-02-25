@@ -278,7 +278,7 @@ router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 
         const public_status = STATUS_MAP[internal_status];
 
         await db.prepare(
-            `UPDATE orders SET internal_status = ?, public_status = ?, updated_at = datetime('now') WHERE id = ?`
+            `UPDATE orders SET internal_status = ?, public_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
         ).run(internal_status, public_status, req.params.id);
 
         // Emit event

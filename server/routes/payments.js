@@ -157,7 +157,7 @@ router.post('/verify', async (req, res) => {
         if (!verified) {
             // Payment failed
             await db.prepare(
-                `UPDATE payments SET status = 'failed', razorpay_payment_id = ?, razorpay_signature = ?, updated_at = datetime('now')
+                `UPDATE payments SET status = 'failed', razorpay_payment_id = ?, razorpay_signature = ?, updated_at = CURRENT_TIMESTAMP
          WHERE razorpay_order_id = ?`
             ).run(razorpay_payment_id || '', razorpay_signature || '', razorpay_order_id);
 
@@ -166,7 +166,7 @@ router.post('/verify', async (req, res) => {
 
         // Payment verified!
         await db.prepare(
-            `UPDATE payments SET status = 'paid', verified = 1, razorpay_payment_id = ?, razorpay_signature = ?, updated_at = datetime('now')
+            `UPDATE payments SET status = 'paid', verified = 1, razorpay_payment_id = ?, razorpay_signature = ?, updated_at = CURRENT_TIMESTAMP
        WHERE razorpay_order_id = ?`
         ).run(razorpay_payment_id || 'mock_pay_' + Date.now(), razorpay_signature || '', razorpay_order_id);
 

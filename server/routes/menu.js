@@ -137,7 +137,7 @@ router.put('/items/:id', authenticateToken, requireRole('admin'), async (req, re
         if (!item) return res.status(404).json({ error: 'Item not found' });
 
         await db.prepare(
-            `UPDATE menu_items SET category_id = ?, name = ?, description = ?, price = ?, image_url = ?, is_veg = ?, active = ?, sort_order = ?, updated_at = datetime('now') WHERE id = ?`
+            `UPDATE menu_items SET category_id = ?, name = ?, description = ?, price = ?, image_url = ?, is_veg = ?, active = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
         ).run(
             category_id || item.category_id, name || item.name, description ?? item.description,
             price ?? item.price, image_url ?? item.image_url, is_veg ?? item.is_veg,
