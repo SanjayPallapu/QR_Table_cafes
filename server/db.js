@@ -3,13 +3,18 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const dns = require('dns');
 
-// Force IPv4 DNS resolution (Render's IPv6 can't reach Supabase)
+// Force IPv4 DNS resolution (Render's IPv6 can't reach Supabase direct host)
 dns.setDefaultResultOrder('ipv4first');
+
+// Detect if using Supabase pooler (pgBouncer) — it doesn't support prepared statements
+const isPooler = (process.env.DATABASE_URL || '').includes('pooler.supabase.com');
 
 // Create connection pool with SSL for Supabase
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  // pgBouncer in transaction mode doesn't support prepared statements
+  ...(isPooler && { prepare: false }),
 });
 
 // Export a query helper with both async and prepare methods
