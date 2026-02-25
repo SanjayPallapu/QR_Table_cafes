@@ -35,7 +35,7 @@ router.post('/create-order', async (req, res) => {
         }
 
         // Validate table
-        const table = db.prepare(
+        const table = await db.prepare(
             'SELECT id, restaurant_id FROM tables WHERE qr_token = ? AND active = 1'
         ).get(table_token);
         if (!table) return res.status(404).json({ error: 'Invalid table' });
@@ -204,29 +204,23 @@ router.post('/verify', async (req, res) => {
             });
         }
 
-        // Create order in transaction
-        const createOrder = db.transaction(() => {
-            const result = db.prepare(
-                `INSERT INTO orders (restaurant_id, table_id, internal_status, public_status, payment_mode, total_amount, notes)
+        // Create order
+        const orderResult = await db.prepare(
+            `INSERT INTO orders (restaurant_id, table_id, internal_status, public_status, payment_mode, total_amount, notes)
          VALUES (?, ?, 'PLACED', 'Order placed', 'PREPAID', ?, ?)`
-            ).run(table.restaurant_id, table.id, totalAmount, notes || '');
+        ).run(table.restaurant_id, table.id, totalAmount, notes || '');
 
-            const newOrderId = result.lastInsertRowid;
+        const newOrderId = orderResult.lastInsertRowid;
 
-            const insertItem = db.prepare(
+        // Insert order items
+        for (const oi of orderItems) {
+            await db.prepare(
                 'INSERT INTO order_items (order_id, menu_item_id, item_name, quantity, price_at_order, notes) VALUES (?, ?, ?, ?, ?, ?)'
-            );
-            for (const oi of orderItems) {
-                insertItem.run(newOrderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
-            }
+            ).run(newOrderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
+        }
 
-            // Link payment to order
-            db.prepare('UPDATE payments SET order_id = ? WHERE razorpay_order_id = ?').run(newOrderId, razorpay_order_id);
-
-            return newOrderId;
-        });
-
-        const newOrderId = createOrder();
+        // Link payment to order
+        await db.prepare('UPDATE payments SET order_id = ? WHERE razorpay_order_id = ?').run(newOrderId, razorpay_order_id);
 
         // Get full order for event
         const order = await db.prepare(

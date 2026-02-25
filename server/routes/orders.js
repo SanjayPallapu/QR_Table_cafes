@@ -64,27 +64,20 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Create order in transaction
-        const createOrder = db.transaction(() => {
-            const result = db.prepare(
-                `INSERT INTO orders (restaurant_id, table_id, internal_status, public_status, payment_mode, total_amount, notes)
+        // Create order
+        const result = await db.prepare(
+            `INSERT INTO orders (restaurant_id, table_id, internal_status, public_status, payment_mode, total_amount, notes)
          VALUES (?, ?, 'PLACED', 'Order placed', ?, ?, ?)`
-            ).run(table.restaurant_id, table.id, payment_mode, totalAmount, notes || '');
+        ).run(table.restaurant_id, table.id, payment_mode, totalAmount, notes || '');
 
-            const orderId = result.lastInsertRowid;
+        const orderId = result.lastInsertRowid;
 
-            const insertItem = db.prepare(
+        // Insert order items
+        for (const oi of orderItems) {
+            await db.prepare(
                 'INSERT INTO order_items (order_id, menu_item_id, item_name, quantity, price_at_order, notes) VALUES (?, ?, ?, ?, ?, ?)'
-            );
-
-            for (const oi of orderItems) {
-                insertItem.run(orderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
-            }
-
-            return orderId;
-        });
-
-        const orderId = createOrder();
+            ).run(orderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
+        }
 
         // Get order with items
         const order = await getOrderById(orderId);

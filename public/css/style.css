@@ -1001,6 +1001,9 @@ body {
 /* ─── Veg Filter Toggle ────────────────────────────────────── */
 
 .filter-bar {
+  position: sticky;
+  top: 116px;
+  z-index: 85;
   display: flex;
   align-items: center;
   gap: 10px;
