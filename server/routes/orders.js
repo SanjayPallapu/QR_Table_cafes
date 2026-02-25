@@ -201,7 +201,7 @@ router.get('/feed/waiter', authenticateToken, requireRole('waiter', 'admin'), as
                 'SELECT item_name, quantity, price_at_order, notes FROM order_items WHERE order_id = ?'
             ).all(order.id);
             return { ...order, items };
-        });
+        }));
 
         res.json(result);
     } catch (err) {
