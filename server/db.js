@@ -140,13 +140,14 @@ async function executeSqlViaRest(sql, params, mode) {
   });
 
   // ─── INSERT ─────────────────────────────────────────────
-  const insertMatch = trimmed.match(/INSERT INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+  const insertMatch = trimmed.match(/INSERT INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\((.+?)\)\s*$/i);
   if (insertMatch) {
     const table = insertMatch[1];
     const columns = insertMatch[2].split(',').map(c => c.trim());
+    const valueTokens = splitSqlCSV(insertMatch[3]);
     const obj = {};
     columns.forEach((col, i) => {
-      obj[col] = params[i] !== undefined ? params[i] : null;
+      obj[col] = resolveInsertValue(valueTokens[i], params);
     });
 
     const { data, error } = await supabase.from(table).insert(obj).select('id').single();
@@ -475,6 +476,59 @@ function splitSetClause(setClause) {
   }
   if (current.trim()) parts.push(current.trim());
   return parts;
+}
+
+function splitSqlCSV(sql) {
+  const parts = [];
+  let current = '';
+  let inQuote = false;
+  let depth = 0;
+
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+
+    if (ch === "'" && sql[i - 1] !== '\\') {
+      inQuote = !inQuote;
+      current += ch;
+      continue;
+    }
+
+    if (!inQuote) {
+      if (ch === '(') depth++;
+      if (ch === ')') depth--;
+
+      if (ch === ',' && depth === 0) {
+        parts.push(current.trim());
+        current = '';
+        continue;
+      }
+    }
+
+    current += ch;
+  }
+
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function resolveInsertValue(token, params) {
+  if (token === undefined) return null;
+
+  const placeholder = token.match(/^\$(\d+)$/);
+  if (placeholder) {
+    return params[parseInt(placeholder[1], 10) - 1] ?? null;
+  }
+
+  if (/^null$/i.test(token)) return null;
+  if (/^current_timestamp$/i.test(token)) return new Date().toISOString();
+  if (/^(true|false)$/i.test(token)) return /^true$/i.test(token);
+
+  const quoted = token.match(/^'(.*)'$/s);
+  if (quoted) return quoted[1].replace(/''/g, "'");
+
+  if (/^-?\d+(\.\d+)?$/.test(token)) return Number(token);
+
+  return token;
 }
 
 function mapJoinColumns(columns, mainTable, joinTable, joinAlias, mainAlias) {
