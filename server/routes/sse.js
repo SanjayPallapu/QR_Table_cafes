@@ -33,6 +33,14 @@ router.get('/kitchen', (req, res) => {
     orderEvents.on('new-order', onNewOrder);
     orderEvents.on('order-updated', onOrderUpdated);
 
+    // Call waiter events
+    const onCallWaiter = (data) => {
+        if (data.restaurant_id == restaurant_id) {
+            res.write(`event: call-waiter\ndata: ${JSON.stringify(data)}\n\n`);
+        }
+    };
+    orderEvents.on('call-waiter', onCallWaiter);
+
     // Keepalive every 30 seconds
     const keepalive = setInterval(() => {
         res.write(': keepalive\n\n');
@@ -42,6 +50,7 @@ router.get('/kitchen', (req, res) => {
         clearInterval(keepalive);
         orderEvents.off('new-order', onNewOrder);
         orderEvents.off('order-updated', onOrderUpdated);
+        orderEvents.off('call-waiter', onCallWaiter);
     });
 });
 
@@ -72,8 +81,16 @@ router.get('/waiter', (req, res) => {
         }
     };
 
+    // Call waiter events
+    const onCallWaiter = (data) => {
+        if (data.restaurant_id == restaurant_id) {
+            res.write(`event: call-waiter\ndata: ${JSON.stringify(data)}\n\n`);
+        }
+    };
+
     orderEvents.on('order-updated', onOrderUpdated);
     orderEvents.on('new-order', onNewOrder);
+    orderEvents.on('call-waiter', onCallWaiter);
 
     const keepalive = setInterval(() => {
         res.write(': keepalive\n\n');
@@ -83,6 +100,7 @@ router.get('/waiter', (req, res) => {
         clearInterval(keepalive);
         orderEvents.off('order-updated', onOrderUpdated);
         orderEvents.off('new-order', onNewOrder);
+        orderEvents.off('call-waiter', onCallWaiter);
     });
 });
 

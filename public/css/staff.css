@@ -752,14 +752,217 @@ body {
 @media (max-width: 768px) {
     .orders-grid {
         grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
     }
 
     .dashboard-stats {
         flex-wrap: nowrap;
+        padding: 12px;
+        gap: 8px;
     }
 
     .stat-card {
-        min-width: 100px;
+        min-width: 90px;
+        padding: 10px 14px;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+    }
+
+    .admin-content {
+        padding: 14px;
+    }
+
+    .modal {
+        max-width: calc(100vw - 32px);
+        margin: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* ─── Dashboard Header ──── */
+    .dashboard-header {
+        padding: 10px 14px;
+    }
+
+    .dashboard-brand h1 {
+        font-size: 0.95rem;
+    }
+
+    .dashboard-brand-icon {
+        font-size: 1.2rem;
+    }
+
+    .dashboard-brand-role {
+        font-size: 0.65rem;
+    }
+
+    .logout-btn {
+        padding: 5px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* ─── Stats ──── */
+    .dashboard-stats {
+        padding: 10px;
+        gap: 6px;
+    }
+
+    .stat-card {
+        min-width: 80px;
+        padding: 8px 10px;
+    }
+
+    .stat-value {
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 0.6rem;
+    }
+
+    /* ─── Order Cards ──── */
+    .orders-grid {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .order-card-header {
+        padding: 10px 12px;
+    }
+
+    .table-number-badge {
+        width: 36px;
+        height: 36px;
+        font-size: 0.95rem;
+    }
+
+    .order-card-body {
+        padding: 10px 12px;
+    }
+
+    .order-card-footer {
+        padding: 10px 12px;
+        flex-wrap: wrap;
+    }
+
+    .order-card-footer .btn-sm {
+        flex: 1;
+        min-width: 0;
+    }
+
+    /* ─── Admin Tabs ──── */
+    .admin-tabs {
+        padding: 0 4px;
+    }
+
+    .admin-tab {
+        padding: 12px 14px;
+        font-size: 0.78rem;
+    }
+
+    /* ─── Data Tables (Scrollable) ──── */
+    .data-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px 10px;
+        font-size: 0.78rem;
+    }
+
+    /* ─── Admin Content ──── */
+    .admin-content {
+        padding: 12px 10px;
+    }
+
+    /* ─── Modals ──── */
+    .modal-overlay {
+        padding: 12px;
+        align-items: flex-end;
+    }
+
+    .modal {
+        max-height: 90vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .modal-header {
+        padding: 14px 16px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-footer {
+        padding: 12px 16px;
+    }
+
+    /* ─── Login Card ──── */
+    .login-card {
+        padding: 28px 20px;
+    }
+
+    .login-title {
+        font-size: 1.2rem;
+    }
+
+    /* ─── QR Display ──── */
+    .qr-image {
+        max-width: 160px;
+    }
+
+    .qr-url {
+        font-size: 0.68rem;
+    }
+
+    /* ─── Touch targets ──── */
+    .btn {
+        min-height: 44px;
+    }
+
+    .btn-sm {
+        min-height: 36px;
+        padding: 8px 12px;
+    }
+
+    .toggle {
+        width: 40px;
+        height: 22px;
+    }
+
+    .toggle-slider::before {
+        height: 16px;
+        width: 16px;
+    }
+
+    .toggle input:checked+.toggle-slider::before {
+        transform: translateX(18px);
+    }
+
+    /* ─── Toasts ──── */
+    .toast-container {
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* ─── Safe Area Insets (Notched phones) ──── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .login-page {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .order-card-footer {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
     }
 }
 

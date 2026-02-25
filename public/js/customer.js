@@ -12,7 +12,9 @@
         cart: [],         // { menu_item_id, name, price, quantity, notes, is_veg }
         paymentMode: null,
         currentOrderId: null,
-        sseConnection: null
+        sseConnection: null,
+        vegOnly: false,
+        waiterCooldown: false
     };
 
     // ─── Init ────────────────────────────────────────────────
@@ -799,5 +801,65 @@
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    // ─── Veg Filter ─────────────────────────────────────────
+
+    window.toggleVegFilter = function () {
+        state.vegOnly = !state.vegOnly;
+        const btn = document.getElementById('veg-filter');
+        btn.classList.toggle('active', state.vegOnly);
+
+        // Filter visible items
+        document.querySelectorAll('.menu-item').forEach(el => {
+            const id = parseInt(el.id.replace('menu-item-', ''));
+            const allItems = state.menu.categories.flatMap(c => c.items);
+            const item = allItems.find(i => i.id === id);
+            if (item) {
+                el.style.display = (state.vegOnly && !item.is_veg) ? 'none' : '';
+            }
+        });
+
+        // Hide sections that have no visible items
+        document.querySelectorAll('.menu-section').forEach(section => {
+            const visibleItems = section.querySelectorAll('.menu-item:not([style*="display: none"])');
+            section.style.display = visibleItems.length === 0 ? 'none' : '';
+        });
+
+        showToast(state.vegOnly ? 'Showing veg items only' : 'Showing all items', 'info');
+    };
+
+    // ─── Call Waiter ─────────────────────────────────────────
+
+    window.callWaiter = async function () {
+        if (state.waiterCooldown) {
+            showToast('Waiter has been notified. Please wait.', 'info');
+            return;
+        }
+
+        const btn = document.getElementById('call-waiter-btn');
+        btn.classList.add('called');
+        btn.textContent = '✓';
+        state.waiterCooldown = true;
+
+        showToast('🔔 Waiter has been called to your table!', 'success');
+
+        // Try to send to server (best-effort)
+        try {
+            await fetch('/api/tables/call-waiter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table_token: state.token })
+            });
+        } catch (e) {
+            // Silently fail — the visual feedback is enough
+        }
+
+        // Reset after 30 seconds
+        setTimeout(() => {
+            btn.classList.remove('called');
+            btn.textContent = '🔔';
+            state.waiterCooldown = false;
+        }, 30000);
+    };
 
 })();

@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Order — Restaurant</title>
   <meta name="description" content="Scan your table QR code to browse the menu and place your order">
   <link rel="stylesheet" href="/css/style.css">
@@ -47,7 +47,18 @@
 
     <nav class="category-nav" id="category-nav"></nav>
 
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-toggle" id="veg-filter" onclick="toggleVegFilter()">
+        <span class="filter-dot"></span> Veg Only
+      </button>
+    </div>
+
     <main id="menu-container"></main>
+
+    <!-- Call Waiter FAB -->
+    <button class="call-waiter-btn" id="call-waiter-btn" onclick="callWaiter()" title="Call Waiter">
+      🔔
+    </button>
 
     <!-- Cart Bar -->
     <div id="cart-bar" class="cart-bar hidden" onclick="openCart()">

@@ -184,4 +184,32 @@ router.post('/:id/regenerate-qr', authenticateToken, requireRole('admin'), async
     }
 });
 
+// POST /api/tables/call-waiter — Customer calls waiter
+router.post('/call-waiter', async (req, res) => {
+    try {
+        const { table_token } = req.body;
+        if (!table_token) return res.status(400).json({ error: 'Table token required' });
+
+        const table = await db.prepare(
+            'SELECT t.id, t.table_number, t.restaurant_id FROM tables t WHERE t.qr_token = ? AND t.active = 1'
+        ).get(table_token);
+
+        if (!table) return res.status(404).json({ error: 'Invalid table' });
+
+        // Emit SSE event to waiter/kitchen dashboards
+        const orderEvents = require('../utils/events');
+        orderEvents.emit('call-waiter', {
+            restaurant_id: table.restaurant_id,
+            table_id: table.id,
+            table_number: table.table_number,
+            timestamp: new Date().toISOString()
+        });
+
+        res.json({ success: true, message: 'Waiter notified' });
+    } catch (err) {
+        console.error('Call waiter error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router;

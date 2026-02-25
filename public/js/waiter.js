@@ -55,6 +55,12 @@
             }
         });
 
+        sse.addEventListener('call-waiter', (e) => {
+            const data = JSON.parse(e.data);
+            playUrgentNotification();
+            showToast(`🔔 Table ${data.table_number} is calling you!`, 'info');
+        });
+
         sse.onerror = () => {
             dot.classList.add('disconnected');
             setTimeout(() => {
@@ -153,14 +159,34 @@
     function playNotification() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.value = 600;
-            gain.gain.value = 0.1;
-            osc.start();
-            osc.stop(ctx.currentTime + 0.2);
+            // Two-tone chime — loud enough to hear
+            [800, 1000].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                gain.gain.value = 0.3;
+                osc.start(ctx.currentTime + i * 0.2);
+                osc.stop(ctx.currentTime + i * 0.2 + 0.15);
+            });
+        } catch (e) { }
+    }
+
+    function playUrgentNotification() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            // Triple urgent beep — hard to miss
+            [900, 1100, 900].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                gain.gain.value = 0.4;
+                osc.start(ctx.currentTime + i * 0.25);
+                osc.stop(ctx.currentTime + i * 0.25 + 0.18);
+            });
         } catch (e) { }
     }
 
