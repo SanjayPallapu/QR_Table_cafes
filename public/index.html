@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Order — Restaurant</title>
   <meta name="description" content="Scan your table QR code to browse the menu and place your order">
   <link rel="stylesheet" href="/css/style.css">
@@ -131,9 +132,44 @@
         </button>
       </div>
 
-      <button class="btn btn-secondary mt-2" onclick="goBackToMenu()">
-        ← Order More Items
-      </button>
+      <div id="order-more-section" class="mt-2">
+        <button class="btn btn-secondary" onclick="goBackToMenu()">
+          + Order More Items
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt View -->
+  <div id="receipt-view" class="hidden">
+    <header class="app-header">
+      <div class="container">
+        <div class="restaurant-name" id="receipt-restaurant-name">Restaurant</div>
+        <div class="table-badge">Table <span id="receipt-table-number">-</span></div>
+      </div>
+    </header>
+    <div class="tracking-view container">
+      <div class="tracking-icon">✅</div>
+      <div class="tracking-status">Payment Successful!</div>
+      <div class="tracking-message">Thank you for dining with us. Here's your receipt.</div>
+
+      <div class="order-summary-card" style="margin-top:24px">
+        <div class="order-summary-title">🧾 Receipt</div>
+        <div id="receipt-items"></div>
+        <div class="order-summary-total">
+          <span>Total Paid</span>
+          <span>₹<span id="receipt-total">0</span></span>
+        </div>
+        <div
+          style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:0.78rem;color:var(--text-muted);display:flex;justify-content:space-between">
+          <span id="receipt-payment-method"></span>
+          <span id="receipt-time"></span>
+        </div>
+      </div>
+
+      <div class="mt-3" style="text-align:center;color:var(--text-muted);font-size:0.85rem">
+        We hope to see you again soon! 🙏
+      </div>
     </div>
   </div>
 

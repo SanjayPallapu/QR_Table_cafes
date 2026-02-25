@@ -100,6 +100,83 @@ router.post('/', async (req, res) => {
     }
 });
 
+// ─── Add items to existing POSTPAID order ─────────────────────
+
+// POST /api/orders/:id/add-items
+router.post('/:id/add-items', async (req, res) => {
+    try {
+        const { table_token, items } = req.body;
+        const orderId = req.params.id;
+
+        if (!table_token || !items || !items.length) {
+            return res.status(400).json({ error: 'table_token and items are required' });
+        }
+
+        // Validate order belongs to this table
+        const table = await db.prepare(
+            'SELECT id, restaurant_id FROM tables WHERE qr_token = ? AND active = 1'
+        ).get(table_token);
+        if (!table) return res.status(404).json({ error: 'Invalid table' });
+
+        const order = await db.prepare(
+            'SELECT id, total_amount, internal_status FROM orders WHERE id = ? AND table_id = ? AND payment_mode = ?'
+        ).get(orderId, table.id, 'POSTPAID');
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+        if (order.internal_status === 'SERVED') {
+            return res.status(400).json({ error: 'Cannot add items to a served order' });
+        }
+
+        // Validate and price new items
+        let additionalAmount = 0;
+        const newItems = [];
+        for (const item of items) {
+            const menuItem = await db.prepare(
+                'SELECT id, name, price FROM menu_items WHERE id = ? AND restaurant_id = ? AND active = 1'
+            ).get(item.menu_item_id, table.restaurant_id);
+            if (!menuItem) return res.status(400).json({ error: `Item ${item.menu_item_id} not found` });
+            const qty = item.quantity || 1;
+            additionalAmount += menuItem.price * qty;
+            newItems.push({
+                menu_item_id: menuItem.id,
+                item_name: menuItem.name,
+                quantity: qty,
+                price_at_order: menuItem.price,
+                notes: item.notes || ''
+            });
+        }
+
+        // Insert new items
+        for (const oi of newItems) {
+            await db.prepare(
+                'INSERT INTO order_items (order_id, menu_item_id, item_name, quantity, price_at_order, notes) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(orderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
+        }
+
+        // Update order total
+        const newTotal = order.total_amount + additionalAmount;
+        await db.prepare('UPDATE orders SET total_amount = ? WHERE id = ?').run(newTotal, orderId);
+
+        const updatedOrder = await getOrderById(orderId);
+        orderEvents.emit('order-updated', {
+            restaurant_id: table.restaurant_id,
+            order_id: parseInt(orderId),
+            internal_status: order.internal_status,
+            public_status: updatedOrder.public_status,
+            table_number: updatedOrder.table_number
+        });
+
+        res.json({
+            order_id: parseInt(orderId),
+            total_amount: newTotal,
+            added_items: newItems.length,
+            public_status: updatedOrder.public_status
+        });
+    } catch (err) {
+        console.error('Add items error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ─── Get order (public - customer) ────────────────────────────
 
 // GET /api/orders/:id?token=<table_token>

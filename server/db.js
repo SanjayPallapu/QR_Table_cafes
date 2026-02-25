@@ -171,13 +171,16 @@ async function executeSqlViaRest(sql, params, mode) {
     let paramIdx = 0;
 
     for (const part of setParts) {
-      const [col, val] = part.split('=').map(s => s.trim());
-      if (val && val.match(/\$\d+/)) {
+      const eqIdx = part.indexOf('=');
+      const col = part.slice(0, eqIdx).trim();
+      const val = part.slice(eqIdx + 1).trim();
+      if (val && val.match(/^\$\d+$/)) {
         updateObj[col] = params[paramIdx++];
-      } else if (val === 'CURRENT_TIMESTAMP') {
+      } else if (/^current_timestamp$/i.test(val)) {
         updateObj[col] = new Date().toISOString();
       } else {
-        updateObj[col] = val;
+        // Use resolveInsertValue to properly strip quotes, handle numbers, booleans
+        updateObj[col] = resolveInsertValue(val, params);
       }
     }
 

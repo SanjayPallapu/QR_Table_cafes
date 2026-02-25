@@ -479,29 +479,55 @@
                     rzp.open();
                 }
             } else {
-                // POSTPAID — Create order directly
-                const resp = await fetch('/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        table_token: state.token,
-                        items,
-                        payment_mode: 'POSTPAID'
-                    })
-                });
+                // POSTPAID: add to existing order OR create new order
+                let result;
 
-                const result = await resp.json();
-                if (result.order_id) {
-                    state.currentOrderId = result.order_id;
-                    state.cart = [];
-                    updateCartUI();
-                    closeCart();
-                    showToast('Order placed! We\'re getting it ready for you.', 'success');
-                    await showTrackingView(result.order_id);
+                if (state.addingToOrderId) {
+                    // Add items to existing POSTPAID order
+                    const resp = await fetch(`/api/orders/${state.addingToOrderId}/add-items`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            table_token: state.token,
+                            items
+                        })
+                    });
+                    result = await resp.json();
+                    if (result.order_id) {
+                        state.cart = [];
+                        updateCartUI();
+                        closeCart();
+                        showToast('Items added to your order!', 'success');
+                        await showTrackingView(result.order_id);
+                    } else {
+                        showToast(result.error || 'Failed to add items', 'error');
+                        btn.disabled = false;
+                        renderCartDrawer();
+                    }
                 } else {
-                    showToast(result.error || 'Failed to place order', 'error');
-                    btn.disabled = false;
-                    renderCartDrawer();
+                    // Create new POSTPAID order
+                    const resp = await fetch('/api/orders', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            table_token: state.token,
+                            items,
+                            payment_mode: 'POSTPAID'
+                        })
+                    });
+                    result = await resp.json();
+                    if (result.order_id) {
+                        state.currentOrderId = result.order_id;
+                        state.cart = [];
+                        updateCartUI();
+                        closeCart();
+                        showToast('Order placed! We\'re getting it ready for you.', 'success');
+                        await showTrackingView(result.order_id);
+                    } else {
+                        showToast(result.error || 'Failed to place order', 'error');
+                        btn.disabled = false;
+                        renderCartDrawer();
+                    }
                 }
             }
         } catch (err) {
@@ -599,8 +625,18 @@
         if (order.payment_mode === 'POSTPAID' && order.payment_status !== 'paid') {
             document.getElementById('pay-bill-amount').textContent = order.total_amount;
             show('pay-bill-section');
+            // Hide order-more if order was served (ready to pay)
+            if (order.internal_status === 'SERVED' || order.public_status === 'Almost ready') {
+                hide('order-more-section');
+            } else {
+                show('order-more-section');
+            }
+        } else if (order.payment_mode === 'POSTPAID' && order.payment_status === 'paid') {
+            hide('pay-bill-section');
+            hide('order-more-section');
         } else {
             hide('pay-bill-section');
+            show('order-more-section');
         }
     }
 
@@ -630,6 +666,9 @@
     // ─── Pay Bill (Postpaid) ─────────────────────────────────
 
     window.payBill = async function () {
+        const payBtn = document.querySelector('#pay-bill-section .btn');
+        if (payBtn) { payBtn.disabled = true; payBtn.textContent = 'Processing...'; }
+
         try {
             const createResp = await fetch('/api/payments/create-order', {
                 method: 'POST',
@@ -644,35 +683,54 @@
             if (!createResp.ok) {
                 const errData = await createResp.json().catch(() => ({}));
                 showToast(errData.error || 'Failed to create payment', 'error');
+                if (payBtn) { payBtn.disabled = false; payBtn.textContent = `💳 Pay Bill — ₹${document.getElementById('pay-bill-amount').textContent}`; }
                 return;
             }
 
             const paymentOrder = await createResp.json();
 
-            if (paymentOrder.mock_mode) {
-                // Mock payment
-                const verifyResp = await fetch('/api/payments/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        razorpay_payment_id: 'mock_pay_' + Date.now(),
-                        razorpay_order_id: paymentOrder.razorpay_order_id,
-                        razorpay_signature: '',
-                        table_token: state.token,
-                        payment_mode: 'POSTPAID',
-                        order_id: state.currentOrderId
-                    })
-                });
+            const onPaymentSuccess = async (razorpayPaymentId, razorpayOrderId, razorpaySignature) => {
+                try {
+                    const verifyResp = await fetch('/api/payments/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_payment_id: razorpayPaymentId,
+                            razorpay_order_id: razorpayOrderId,
+                            razorpay_signature: razorpaySignature || '',
+                            table_token: state.token,
+                            payment_mode: 'POSTPAID',
+                            order_id: state.currentOrderId
+                        })
+                    });
 
-                const result = await verifyResp.json();
-                if (result.verified) {
-                    showToast('Payment successful! Thank you for dining with us.', 'success');
-                    hide('pay-bill-section');
+                    const result = await verifyResp.json();
+                    if (result.verified) {
+                        // Fetch full order for receipt
+                        const orderResp = await fetch(`/api/orders/${state.currentOrderId}?token=${state.token}`);
+                        const order = await orderResp.json();
+                        showReceiptView(order, 'UPI / Online');
+                    } else {
+                        showToast(result.error || 'Verification failed', 'error');
+                        if (payBtn) { payBtn.disabled = false; payBtn.textContent = `💳 Pay Bill — ₹${document.getElementById('pay-bill-amount').textContent}`; }
+                    }
+                } catch (verifyErr) {
+                    console.error('Verify error:', verifyErr);
+                    showToast('Verification error. Please contact staff.', 'error');
+                    if (payBtn) { payBtn.disabled = false; }
                 }
+            };
+
+            if (paymentOrder.mock_mode) {
+                await onPaymentSuccess(
+                    'mock_pay_' + Date.now(),
+                    paymentOrder.razorpay_order_id,
+                    ''
+                );
             } else {
-                // Real Razorpay
                 if (typeof window.Razorpay === 'undefined') {
                     showToast('Payment gateway is loading. Please wait and try again.', 'error');
+                    if (payBtn) { payBtn.disabled = false; }
                     return;
                 }
 
@@ -684,74 +742,33 @@
                     description: 'Bill Payment',
                     order_id: paymentOrder.razorpay_order_id,
                     handler: async function (response) {
-                        try {
-                            const verifyResp = await fetch('/api/payments/verify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    razorpay_payment_id: response.razorpay_payment_id,
-                                    razorpay_order_id: response.razorpay_order_id,
-                                    razorpay_signature: response.razorpay_signature,
-                                    table_token: state.token,
-                                    payment_mode: 'POSTPAID',
-                                    order_id: state.currentOrderId
-                                })
-                            });
-
-                            const result = await verifyResp.json();
-                            if (result.verified) {
-                                showToast('Payment successful! Thank you for dining with us.', 'success');
-                                hide('pay-bill-section');
-                            } else {
-                                showToast(result.error || 'Verification failed', 'error');
-                            }
-                        } catch (verifyErr) {
-                            console.error('Verify error:', verifyErr);
-                            showToast('Verification error. Please contact staff.', 'error');
-                        }
+                        await onPaymentSuccess(
+                            response.razorpay_payment_id,
+                            response.razorpay_order_id,
+                            response.razorpay_signature
+                        );
                     },
                     modal: {
                         ondismiss: function () {
                             showToast('Payment cancelled', 'info');
+                            if (payBtn) { payBtn.disabled = false; payBtn.textContent = `💳 Pay Bill — ₹${document.getElementById('pay-bill-amount').textContent}`; }
                         }
                     },
-                    prefill: {
-                        contact: '9390418552',
-                        method: 'upi'
-                    },
-                    config: {
-                        display: {
-                            blocks: {
-                                upi: {
-                                    name: 'Pay via UPI',
-                                    instruments: [
-                                        {
-                                            method: 'upi',
-                                            flows: ['intent', 'collect', 'qr'],
-                                            apps: ['google_pay', 'phonepe', 'paytm']
-                                        }
-                                    ]
-                                }
-                            },
-                            sequence: ['block.upi'],
-                            preferences: {
-                                show_default_blocks: true
-                            }
-                        }
-                    },
+                    prefill: { method: 'upi' },
                     theme: { color: '#e8a838' }
                 };
 
                 const rzp = new window.Razorpay(options);
                 rzp.on('payment.failed', function (resp) {
-                    console.error('Payment failed:', resp.error);
                     showToast(resp.error?.description || 'Payment failed. Please try again.', 'error');
+                    if (payBtn) { payBtn.disabled = false; }
                 });
                 rzp.open();
             }
         } catch (err) {
             console.error('Pay bill error:', err);
             showToast('Payment failed. Please try again.', 'error');
+            if (payBtn) { payBtn.disabled = false; }
         }
     };
 
@@ -759,10 +776,53 @@
         if (state.sseConnection) {
             state.sseConnection.close();
         }
+        // Remember the current order so new items get added to it (not a new order)
+        if (state.currentOrderId && state.paymentMode === 'POSTPAID') {
+            state.addingToOrderId = state.currentOrderId;
+        }
         hide('tracking-view');
+        hide('receipt-view');
         show('menu-view');
+        // Reset cart to empty for the new round of items
+        state.cart = [];
+        updateCartUI();
         window.history.replaceState({}, '', `/order?token=${state.token}`);
     };
+
+    function showReceiptView(order, paymentMethod) {
+        if (state.sseConnection) { state.sseConnection.close(); }
+
+        hide('tracking-view');
+        hide('menu-view');
+        show('receipt-view');
+
+        document.getElementById('receipt-restaurant-name').textContent =
+            state.tableInfo?.restaurant_name || 'Restaurant';
+        document.getElementById('receipt-table-number').textContent =
+            order.table_number || state.tableInfo?.table_number || '-';
+
+        // Items
+        const itemsHtml = (order.items || []).map(item =>
+            `<div class="order-summary-item">
+               <span>${item.quantity}× ${item.item_name}</span>
+               <span>₹${item.price_at_order * item.quantity}</span>
+             </div>`
+        ).join('');
+        document.getElementById('receipt-items').innerHTML = itemsHtml;
+        document.getElementById('receipt-total').textContent = order.total_amount;
+
+        // Payment details
+        document.getElementById('receipt-payment-method').textContent =
+            '💳 ' + (paymentMethod || (order.payment_mode === 'POSTPAID' ? 'Pay at Table' : 'Online'));
+        const now = new Date();
+        document.getElementById('receipt-time').textContent =
+            now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) +
+            ' · ' + now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+        // Clear addingToOrderId since order is fully paid
+        state.addingToOrderId = null;
+        state.currentOrderId = null;
+    }
 
     // ─── Category Scroll ─────────────────────────────────────
 
