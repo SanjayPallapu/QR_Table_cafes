@@ -330,10 +330,35 @@
         }));
 
         try {
+            // If we're adding to an existing order (via "Order More Items"), use add-items
+            if (state.addingToOrderId) {
+                const resp = await fetch(`/api/orders/${state.addingToOrderId}/add-items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        table_token: state.token,
+                        items
+                    })
+                });
+                const result = await resp.json();
+                if (result.order_id) {
+                    state.currentOrderId = result.order_id;
+                    state.cart = [];
+                    updateCartUI();
+                    closeCart();
+                    showToast('Items added to your order!', 'success');
+                    await showTrackingView(result.order_id);
+                } else {
+                    showToast(result.error || 'Failed to add items', 'error');
+                    btn.disabled = false;
+                    renderCartDrawer();
+                }
+                return;
+            }
+
             if (state.paymentMode === 'PREPAID') {
                 // Step 1: Create Razorpay order
                 const totalAmount = state.cart.reduce((s, c) => s + (c.price * c.quantity), 0);
-
                 const createResp = await fetch('/api/payments/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
