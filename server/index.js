@@ -76,21 +76,19 @@ app.get('/api/health', (req, res) => {
 app.get('/api/health/db', async (req, res) => {
     try {
         const db = require('./db');
-        const dbUrl = process.env.DATABASE_URL || 'NOT SET';
-        const host = dbUrl !== 'NOT SET' ? dbUrl.split('@')[1]?.split('/')[0] : 'N/A';
+        const supabaseUrl = process.env.SUPABASE_URL || 'NOT SET';
         const result = await db.query('SELECT COUNT(*) as count FROM users');
         res.json({
             status: 'connected',
-            db_host: host,
+            db_host: supabaseUrl,
             users_count: result.rows[0].count,
             timestamp: new Date().toISOString()
         });
     } catch (err) {
-        const dbUrl = process.env.DATABASE_URL || 'NOT SET';
-        const host = dbUrl !== 'NOT SET' ? dbUrl.split('@')[1]?.split('/')[0] : 'N/A';
+        const supabaseUrl = process.env.SUPABASE_URL || 'NOT SET';
         res.status(500).json({
             status: 'error',
-            db_host: host,
+            db_host: supabaseUrl,
             error: err.message,
             timestamp: new Date().toISOString()
         });
