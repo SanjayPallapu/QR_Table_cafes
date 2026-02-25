@@ -772,20 +772,31 @@
         }
     };
 
-    window.goBackToMenu = function () {
+    window.goBackToMenu = async function () {
         if (state.sseConnection) {
             state.sseConnection.close();
         }
         // Remember the current order so new items get added to it (not a new order)
-        if (state.currentOrderId && state.paymentMode === 'POSTPAID') {
+        if (state.currentOrderId) {
             state.addingToOrderId = state.currentOrderId;
         }
         hide('tracking-view');
         hide('receipt-view');
-        show('menu-view');
+
+        // If menu was never loaded (page opened directly into tracking), load it now
+        if (!state.menu) {
+            await loadMenu();
+        } else {
+            show('menu-view');
+        }
+
         // Reset cart to empty for the new round of items
         state.cart = [];
         updateCartUI();
+        // Re-render menu items to reset any quantity badges
+        if (state.menu) {
+            renderMenu(state.menu.categories);
+        }
         window.history.replaceState({}, '', `/order?token=${state.token}`);
     };
 
