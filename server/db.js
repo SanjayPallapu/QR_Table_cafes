@@ -1,6 +1,10 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const dns = require('dns');
+
+// Force IPv4 DNS resolution (Render's IPv6 can't reach Supabase)
+dns.setDefaultResultOrder('ipv4first');
 
 // Create connection pool with SSL for Supabase
 const pool = new Pool({
