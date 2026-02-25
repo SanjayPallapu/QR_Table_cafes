@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Order — Restaurant</title>
+  <meta name="description" content="Scan your table QR code to browse the menu and place your order">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+</head>
+
+<body>
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Loading State -->
+  <div id="loading-view" class="loading-spinner">
+    <div class="spinner"></div>
+    <p class="text-secondary">Preparing your menu...</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="error-view" class="error-page hidden">
+    <div class="error-icon">😕</div>
+    <h1 class="error-title">Oops!</h1>
+    <p id="error-message" class="error-message">
+      This doesn't look like a valid table link. Please scan the QR code on your table.
+    </p>
+  </div>
+
+  <!-- Menu View -->
+  <div id="menu-view" class="hidden">
+    <header class="app-header">
+      <div class="container">
+        <div class="restaurant-name" id="restaurant-name">Restaurant</div>
+        <div class="table-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18M9 3v18" />
+          </svg>
+          Table <span id="table-number">-</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="category-nav" id="category-nav"></nav>
+
+    <main id="menu-container"></main>
+
+    <!-- Cart Bar -->
+    <div id="cart-bar" class="cart-bar hidden" onclick="openCart()">
+      <div class="cart-info">
+        <div class="cart-count" id="cart-count">0</div>
+        <span class="cart-label">View Cart</span>
+      </div>
+      <div class="cart-total">₹<span id="cart-total">0</span></div>
+    </div>
+  </div>
+
+  <!-- Cart Overlay / Drawer -->
+  <div id="cart-overlay" class="cart-overlay" onclick="closeCartOnOverlay(event)">
+    <div class="cart-drawer" onclick="event.stopPropagation()">
+      <div class="cart-handle"></div>
+      <div class="cart-header">
+        <h2 class="cart-title">Your Order</h2>
+        <button class="cart-clear" onclick="clearCart()">Clear All</button>
+      </div>
+      <div class="cart-items" id="cart-items"></div>
+      <div class="cart-footer">
+        <div class="cart-summary">
+          <span class="cart-summary-label">Total</span>
+          <span class="cart-summary-value">₹<span id="cart-total-drawer">0</span></span>
+        </div>
+        <div class="payment-options" id="payment-options"></div>
+        <button id="place-order-btn" class="btn btn-primary" onclick="placeOrder()">
+          Place Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Tracking View -->
+  <div id="tracking-view" class="hidden">
+    <header class="app-header">
+      <div class="container">
+        <div class="restaurant-name" id="tracking-restaurant-name">Restaurant</div>
+        <div class="table-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18M9 3v18" />
+          </svg>
+          Table <span id="tracking-table-number">-</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="tracking-view container">
+      <div class="tracking-icon" id="tracking-icon">🍳</div>
+      <div class="tracking-status" id="tracking-status">Order placed</div>
+      <div class="tracking-message" id="tracking-message">
+        Your order is being prepared. Sit back and relax — we'll bring it to your table.
+      </div>
+
+      <div class="status-steps" id="status-steps"></div>
+
+      <div class="order-summary-card">
+        <div class="order-summary-title">Order Summary</div>
+        <div id="tracking-items"></div>
+        <div class="order-summary-total">
+          <span>Total</span>
+          <span>₹<span id="tracking-total">0</span></span>
+        </div>
+      </div>
+
+      <div id="pay-bill-section" class="hidden mt-2">
+        <button class="btn btn-primary" onclick="payBill()">
+          💳 Pay Bill — ₹<span id="pay-bill-amount">0</span>
+        </button>
+      </div>
+
+      <button class="btn btn-secondary mt-2" onclick="goBackToMenu()">
+        ← Order More Items
+      </button>
+    </div>
+  </div>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="/js/customer.js"></script>
+</body>
+
+</html>

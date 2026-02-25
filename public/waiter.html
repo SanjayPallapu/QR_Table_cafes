@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waiter Dashboard</title>
+    <link rel="stylesheet" href="/css/staff.css">
+</head>
+
+<body>
+    <div id="toast-container" class="toast-container"></div>
+
+    <header class="dashboard-header">
+        <div class="dashboard-brand">
+            <span class="dashboard-brand-icon">🍽️</span>
+            <div>
+                <h1>Waiter Dashboard</h1>
+                <div class="dashboard-brand-role">Food Runner</div>
+            </div>
+        </div>
+        <div class="dashboard-actions">
+            <div class="connection-dot" id="connection-dot" title="Real-time connection"></div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-ready">0</div>
+            <div class="stat-label">Ready to Serve</div>
+        </div>
+    </div>
+
+    <div id="orders-container" class="orders-grid"></div>
+
+    <div id="empty-state" class="empty-state hidden">
+        <div class="empty-state-icon">☕</div>
+        <div class="empty-state-text">No orders ready — take a breather!</div>
+    </div>
+
+    <script src="/js/waiter.js"></script>
+</body>
+
+</html>

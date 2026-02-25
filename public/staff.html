@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Login — QR Restaurant</title>
+    <link rel="stylesheet" href="/css/staff.css">
+</head>
+
+<body>
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-logo">🍽️</div>
+            <h1 class="login-title">Staff Login</h1>
+            <p class="login-subtitle">Sign in to access your dashboard</p>
+
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input class="form-input" type="text" id="username" placeholder="Enter username" required
+                        autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input class="form-input" type="password" id="password" placeholder="Enter password" required
+                        autocomplete="current-password">
+                </div>
+                <div class="login-error" id="login-error"></div>
+                <button class="btn btn-primary" type="submit" id="login-btn">Sign In</button>
+            </form>
+
+            <p style="text-align:center;margin-top:20px;font-size:0.75rem;color:var(--text-muted)">
+                Contact your admin if you need access
+            </p>
+        </div>
+    </div>
+
+    <script>
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = '';
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+
+                const data = await resp.json();
+
+                if (!resp.ok) {
+                    errorEl.textContent = data.error || 'Login failed';
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                    return;
+                }
+
+                // Store token
+                localStorage.setItem('staff_token', data.token);
+                localStorage.setItem('staff_user', JSON.stringify(data.user));
+
+                // Redirect based on role
+                const roleRoutes = {
+                    admin: '/admin',
+                    kitchen: '/kitchen',
+                    waiter: '/waiter'
+                };
+
+                window.location.href = roleRoutes[data.user.role] || '/staff';
+            } catch (err) {
+                errorEl.textContent = 'Connection error. Please try again.';
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        }
+
+        // Auto-redirect if already logged in
+        (function () {
+            const token = localStorage.getItem('staff_token');
+            const user = JSON.parse(localStorage.getItem('staff_user') || 'null');
+            if (token && user) {
+                const routes = { admin: '/admin', kitchen: '/kitchen', waiter: '/waiter' };
+                if (routes[user.role]) window.location.href = routes[user.role];
+            }
+        })();
+    </script>
+</body>
+
+</html>

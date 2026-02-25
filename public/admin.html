@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — QR Restaurant</title>
+    <link rel="stylesheet" href="/css/staff.css">
+</head>
+
+<body>
+    <div id="toast-container" class="toast-container"></div>
+
+    <header class="dashboard-header">
+        <div class="dashboard-brand">
+            <span class="dashboard-brand-icon">⚙️</span>
+            <div>
+                <h1>Admin Panel</h1>
+                <div class="dashboard-brand-role" id="admin-name">Administrator</div>
+            </div>
+        </div>
+        <div class="dashboard-actions">
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <nav class="admin-tabs" id="admin-tabs">
+        <button class="admin-tab active" data-tab="menu" onclick="switchTab('menu')">📋 Menu</button>
+        <button class="admin-tab" data-tab="tables" onclick="switchTab('tables')">🪑 Tables & QR</button>
+        <button class="admin-tab" data-tab="orders" onclick="switchTab('orders')">📦 Orders</button>
+        <button class="admin-tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
+    </nav>
+
+    <!-- Menu Tab -->
+    <div class="admin-content" id="tab-menu">
+        <div
+            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <h2 style="font-size:1.1rem;font-weight:700">Menu Management</h2>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="showAddCategoryModal()">+ Category</button>
+                <button class="btn btn-primary btn-sm" onclick="showAddItemModal()">+ Item</button>
+            </div>
+        </div>
+        <div id="menu-content"></div>
+    </div>
+
+    <!-- Tables Tab -->
+    <div class="admin-content hidden" id="tab-tables">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 style="font-size:1.1rem;font-weight:700">Tables & QR Codes</h2>
+            <button class="btn btn-primary btn-sm" onclick="showAddTableModal()">+ Add Table</button>
+        </div>
+        <div id="tables-content"></div>
+    </div>
+
+    <!-- Orders Tab -->
+    <div class="admin-content hidden" id="tab-orders">
+        <div
+            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <h2 style="font-size:1.1rem;font-weight:700">Orders</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="date" id="orders-date" class="form-input"
+                    style="width:auto;padding:6px 10px;font-size:0.8rem" onchange="loadOrders()">
+                <select id="orders-status" class="form-input" style="width:auto;padding:6px 10px;font-size:0.8rem"
+                    onchange="loadOrders()">
+                    <option value="">All Statuses</option>
+                    <option value="PLACED">Placed</option>
+                    <option value="PREPARING">Preparing</option>
+                    <option value="READY">Ready</option>
+                    <option value="SERVED">Served</option>
+                </select>
+            </div>
+        </div>
+        <div id="orders-content"></div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="admin-content hidden" id="tab-settings">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">Restaurant Settings</h2>
+        <div id="settings-content"></div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-container"></div>
+
+    <script src="/js/admin.js"></script>
+</body>
+
+</html>

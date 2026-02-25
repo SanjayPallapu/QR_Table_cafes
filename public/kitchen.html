@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Dashboard — KDS</title>
+    <link rel="stylesheet" href="/css/staff.css">
+</head>
+
+<body>
+    <div id="toast-container" class="toast-container"></div>
+
+    <header class="dashboard-header">
+        <div class="dashboard-brand">
+            <span class="dashboard-brand-icon">👨‍🍳</span>
+            <div>
+                <h1>Kitchen Display</h1>
+                <div class="dashboard-brand-role">KDS</div>
+            </div>
+        </div>
+        <div class="dashboard-actions">
+            <div class="connection-dot" id="connection-dot" title="Real-time connection"></div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <div class="dashboard-stats" id="stats-bar">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-new">0</div>
+            <div class="stat-label">New Orders</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-preparing">0</div>
+            <div class="stat-label">Preparing</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">Total Active</div>
+        </div>
+    </div>
+
+    <div id="orders-container" class="orders-grid"></div>
+
+    <div id="empty-state" class="empty-state hidden">
+        <div class="empty-state-icon">✨</div>
+        <div class="empty-state-text">No active orders — kitchen is clear!</div>
+    </div>
+
+    <script src="/js/kitchen.js"></script>
+</body>
+
+</html>
