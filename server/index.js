@@ -72,6 +72,31 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// DB health check (debug)
+app.get('/api/health/db', async (req, res) => {
+    try {
+        const db = require('./db');
+        const dbUrl = process.env.DATABASE_URL || 'NOT SET';
+        const host = dbUrl !== 'NOT SET' ? dbUrl.split('@')[1]?.split('/')[0] : 'N/A';
+        const result = await db.query('SELECT COUNT(*) as count FROM users');
+        res.json({
+            status: 'connected',
+            db_host: host,
+            users_count: result.rows[0].count,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        const dbUrl = process.env.DATABASE_URL || 'NOT SET';
+        const host = dbUrl !== 'NOT SET' ? dbUrl.split('@')[1]?.split('/')[0] : 'N/A';
+        res.status(500).json({
+            status: 'error',
+            db_host: host,
+            error: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // 404 handler
 app.use((req, res) => {
     if (req.path.startsWith('/api/')) {
