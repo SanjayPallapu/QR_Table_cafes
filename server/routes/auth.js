@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 
 // POST /api/auth/login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
@@ -13,7 +13,7 @@ router.post('/login', (req, res) => {
             return res.status(400).json({ error: 'Username and password are required' });
         }
 
-        const user = db.prepare(
+        const user = await db.prepare(
             'SELECT id, username, password_hash, role, name, restaurant_id FROM users WHERE username = ? AND active = 1'
         ).get(username);
 

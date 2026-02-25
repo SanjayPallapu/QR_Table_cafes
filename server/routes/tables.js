@@ -8,10 +8,10 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 // ─── Public: Validate QR token ────────────────────────────────
 
 // GET /api/tables/validate/:token
-router.get('/validate/:token', (req, res) => {
+router.get('/validate/:token', async (req, res) => {
     try {
         const { token } = req.params;
-        const table = db.prepare(
+        const table = await db.prepare(
             `SELECT t.id, t.table_number, t.seats, t.restaurant_id,
               r.name as restaurant_name, r.description as restaurant_description,
               r.prepaid_enabled, r.postpaid_enabled
@@ -25,7 +25,7 @@ router.get('/validate/:token', (req, res) => {
         }
 
         // Check for active unpaid postpaid orders on this table
-        const activeOrder = db.prepare(
+        const activeOrder = await db.prepare(
             `SELECT o.id, o.public_status, o.payment_mode, o.total_amount, o.created_at
        FROM orders o
        WHERE o.table_id = ? AND o.payment_mode = 'POSTPAID'
@@ -34,7 +34,7 @@ router.get('/validate/:token', (req, res) => {
         ).get(table.id);
 
         // Check for unpaid postpaid orders that are served (waiting for payment)
-        const unpaidOrder = db.prepare(
+        const unpaidOrder = await db.prepare(
             `SELECT o.id, o.total_amount, o.created_at
        FROM orders o
        LEFT JOIN payments p ON p.order_id = o.id AND p.verified = 1
@@ -64,9 +64,9 @@ router.get('/validate/:token', (req, res) => {
 // ─── Admin: Table management ──────────────────────────────────
 
 // GET /api/tables
-router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const tables = db.prepare(
+        const tables = await db.prepare(
             'SELECT * FROM tables WHERE restaurant_id = ? ORDER BY table_number'
         ).all(req.user.restaurant_id);
         res.json(tables);
@@ -77,22 +77,22 @@ router.get('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // POST /api/tables
-router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
+router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { table_number, seats } = req.body;
         if (!table_number) return res.status(400).json({ error: 'Table number is required' });
 
-        const existing = db.prepare(
+        const existing = await db.prepare(
             'SELECT id FROM tables WHERE restaurant_id = ? AND table_number = ?'
         ).get(req.user.restaurant_id, table_number);
         if (existing) return res.status(409).json({ error: 'Table number already exists' });
 
         const qr_token = uuidv4();
-        const result = db.prepare(
+        const result = await db.prepare(
             'INSERT INTO tables (restaurant_id, table_number, qr_token, seats) VALUES (?, ?, ?, ?)'
         ).run(req.user.restaurant_id, table_number, qr_token, seats || 4);
 
-        const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(result.lastInsertRowid);
+        const table = await db.prepare('SELECT * FROM tables WHERE id = ?').get(result.lastInsertRowid);
         res.status(201).json(table);
     } catch (err) {
         console.error('Table create error:', err);
@@ -101,24 +101,24 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // PUT /api/tables/:id
-router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { table_number, seats, active } = req.body;
-        const table = db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
+        const table = await db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
         if (!table) return res.status(404).json({ error: 'Table not found' });
 
         if (table_number && table_number !== table.table_number) {
-            const existing = db.prepare(
+            const existing = await db.prepare(
                 'SELECT id FROM tables WHERE restaurant_id = ? AND table_number = ? AND id != ?'
             ).get(req.user.restaurant_id, table_number, req.params.id);
             if (existing) return res.status(409).json({ error: 'Table number already exists' });
         }
 
-        db.prepare(
+        await db.prepare(
             'UPDATE tables SET table_number = ?, seats = ?, active = ? WHERE id = ?'
         ).run(table_number || table.table_number, seats ?? table.seats, active ?? table.active, req.params.id);
 
-        const updated = db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id);
+        const updated = await db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id);
         res.json(updated);
     } catch (err) {
         console.error('Table update error:', err);
@@ -127,12 +127,12 @@ router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 });
 
 // DELETE /api/tables/:id
-router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
+router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const table = db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
+        const table = await db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
         if (!table) return res.status(404).json({ error: 'Table not found' });
 
-        db.prepare('UPDATE tables SET active = 0 WHERE id = ?').run(req.params.id);
+        await db.prepare('UPDATE tables SET active = 0 WHERE id = ?').run(req.params.id);
         res.json({ success: true });
     } catch (err) {
         console.error('Table delete error:', err);
@@ -143,7 +143,7 @@ router.delete('/:id', authenticateToken, requireRole('admin'), (req, res) => {
 // GET /api/tables/:id/qr — Generate QR code image
 router.get('/:id/qr', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const table = db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
+        const table = await db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
         if (!table) return res.status(404).json({ error: 'Table not found' });
 
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
@@ -168,15 +168,15 @@ router.get('/:id/qr', authenticateToken, requireRole('admin'), async (req, res) 
 });
 
 // POST /api/tables/:id/regenerate-qr
-router.post('/:id/regenerate-qr', authenticateToken, requireRole('admin'), (req, res) => {
+router.post('/:id/regenerate-qr', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
-        const table = db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
+        const table = await db.prepare('SELECT * FROM tables WHERE id = ? AND restaurant_id = ?').get(req.params.id, req.user.restaurant_id);
         if (!table) return res.status(404).json({ error: 'Table not found' });
 
         const newToken = uuidv4();
-        db.prepare('UPDATE tables SET qr_token = ? WHERE id = ?').run(newToken, req.params.id);
+        await db.prepare('UPDATE tables SET qr_token = ? WHERE id = ?').run(newToken, req.params.id);
 
-        const updated = db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id);
+        const updated = await db.prepare('SELECT * FROM tables WHERE id = ?').get(req.params.id);
         res.json(updated);
     } catch (err) {
         console.error('QR regenerate error:', err);

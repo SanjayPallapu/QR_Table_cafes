@@ -45,7 +45,7 @@ router.post('/create-order', async (req, res) => {
 
         if (order_id) {
             // Postpaid bill: look up order amount from database
-            const existingOrder = db.prepare(
+            const existingOrder = await db.prepare(
                 'SELECT total_amount FROM orders WHERE id = ? AND table_id = ?'
             ).get(order_id, table.id);
             if (!existingOrder) return res.status(404).json({ error: 'Order not found for this table' });
@@ -53,7 +53,7 @@ router.post('/create-order', async (req, res) => {
         } else if (items && items.length) {
             // New prepaid order: calculate from items
             for (const item of items) {
-                const menuItem = db.prepare(
+                const menuItem = await db.prepare(
                     'SELECT price FROM menu_items WHERE id = ? AND active = 1'
                 ).get(item.menu_item_id);
                 if (!menuItem) return res.status(400).json({ error: `Item ${item.menu_item_id} not found` });
@@ -80,7 +80,7 @@ router.post('/create-order', async (req, res) => {
             });
 
             // Store payment record
-            const result = db.prepare(
+            const result = await db.prepare(
                 `INSERT INTO payments (restaurant_id, razorpay_order_id, amount, payment_mode, status)
          VALUES (?, ?, ?, ?, 'created')`
             ).run(table.restaurant_id, rpOrder.id, serverAmount, payment_mode || 'PREPAID');
@@ -95,7 +95,7 @@ router.post('/create-order', async (req, res) => {
         } else {
             // Mock mode for development
             const mockOrderId = `order_mock_${Date.now()}`;
-            const result = db.prepare(
+            const result = await db.prepare(
                 `INSERT INTO payments (restaurant_id, razorpay_order_id, amount, payment_mode, status)
          VALUES (?, ?, ?, ?, 'created')`
             ).run(table.restaurant_id, mockOrderId, serverAmount, payment_mode || 'PREPAID');
@@ -118,7 +118,7 @@ router.post('/create-order', async (req, res) => {
 // ─── Verify Payment ───────────────────────────────────────────
 
 // POST /api/payments/verify
-router.post('/verify', (req, res) => {
+router.post('/verify', async (req, res) => {
     try {
         const { razorpay_payment_id, razorpay_order_id, razorpay_signature, table_token, items, payment_mode, notes, order_id } = req.body;
 
@@ -127,12 +127,12 @@ router.post('/verify', (req, res) => {
         }
 
         // Validate table
-        const table = db.prepare(
+        const table = await db.prepare(
             'SELECT id, restaurant_id FROM tables WHERE qr_token = ? AND active = 1'
         ).get(table_token);
         if (!table) return res.status(404).json({ error: 'Invalid table' });
 
-        const payment = db.prepare(
+        const payment = await db.prepare(
             'SELECT * FROM payments WHERE razorpay_order_id = ?'
         ).get(razorpay_order_id);
         if (!payment) return res.status(404).json({ error: 'Payment record not found' });
@@ -156,7 +156,7 @@ router.post('/verify', (req, res) => {
 
         if (!verified) {
             // Payment failed
-            db.prepare(
+            await db.prepare(
                 `UPDATE payments SET status = 'failed', razorpay_payment_id = ?, razorpay_signature = ?, updated_at = datetime('now')
          WHERE razorpay_order_id = ?`
             ).run(razorpay_payment_id || '', razorpay_signature || '', razorpay_order_id);
@@ -165,14 +165,14 @@ router.post('/verify', (req, res) => {
         }
 
         // Payment verified!
-        db.prepare(
+        await db.prepare(
             `UPDATE payments SET status = 'paid', verified = 1, razorpay_payment_id = ?, razorpay_signature = ?, updated_at = datetime('now')
        WHERE razorpay_order_id = ?`
         ).run(razorpay_payment_id || 'mock_pay_' + Date.now(), razorpay_signature || '', razorpay_order_id);
 
         // For POSTPAID: Just mark the existing order as paid
         if (payment_mode === 'POSTPAID' && order_id) {
-            db.prepare('UPDATE payments SET order_id = ? WHERE razorpay_order_id = ?').run(order_id, razorpay_order_id);
+            await db.prepare('UPDATE payments SET order_id = ? WHERE razorpay_order_id = ?').run(order_id, razorpay_order_id);
             return res.json({
                 verified: true,
                 order_id: order_id,
@@ -189,7 +189,7 @@ router.post('/verify', (req, res) => {
         let totalAmount = 0;
         const orderItems = [];
         for (const item of items) {
-            const menuItem = db.prepare(
+            const menuItem = await db.prepare(
                 'SELECT id, name, price FROM menu_items WHERE id = ? AND restaurant_id = ? AND active = 1'
             ).get(item.menu_item_id, table.restaurant_id);
             if (!menuItem) continue;
@@ -229,10 +229,10 @@ router.post('/verify', (req, res) => {
         const newOrderId = createOrder();
 
         // Get full order for event
-        const order = db.prepare(
+        const order = await db.prepare(
             `SELECT o.*, t.table_number FROM orders o JOIN tables t ON o.table_id = t.id WHERE o.id = ?`
         ).get(newOrderId);
-        order.items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(newOrderId);
+        order.items = await db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(newOrderId);
 
         // Emit event for kitchen
         orderEvents.emit('new-order', {
@@ -258,7 +258,7 @@ router.post('/verify', (req, res) => {
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // GET /api/payments/report
-router.get('/report', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/report', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { date } = req.query;
         let query = `SELECT p.*, o.table_id, t.table_number
@@ -275,10 +275,10 @@ router.get('/report', authenticateToken, requireRole('admin'), (req, res) => {
 
         query += ` ORDER BY p.created_at DESC LIMIT 100`;
 
-        const payments = db.prepare(query).all(...params);
+        const payments = await db.prepare(query).all(...params);
 
         // Summary
-        const todayPayments = db.prepare(
+        const todayPayments = await db.prepare(
             `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
        FROM payments WHERE restaurant_id = ? AND verified = 1 AND date(created_at) = date('now')`
         ).get(req.user.restaurant_id);

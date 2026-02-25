@@ -15,7 +15,7 @@ const STATUS_MAP = {
 // ─── Create Order (Postpaid or after Prepaid verification) ────
 
 // POST /api/orders
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { table_token, items, payment_mode, notes } = req.body;
 
@@ -28,7 +28,7 @@ router.post('/', (req, res) => {
         }
 
         // Validate table
-        const table = db.prepare(
+        const table = await db.prepare(
             'SELECT id, restaurant_id FROM tables WHERE qr_token = ? AND active = 1'
         ).get(table_token);
         if (!table) return res.status(404).json({ error: 'Invalid table' });
@@ -44,7 +44,7 @@ router.post('/', (req, res) => {
         const orderItems = [];
 
         for (const item of items) {
-            const menuItem = db.prepare(
+            const menuItem = await db.prepare(
                 'SELECT id, name, price FROM menu_items WHERE id = ? AND restaurant_id = ? AND active = 1'
             ).get(item.menu_item_id, table.restaurant_id);
 
@@ -87,7 +87,7 @@ router.post('/', (req, res) => {
         const orderId = createOrder();
 
         // Get order with items
-        const order = getOrderById(orderId);
+        const order = await getOrderById(orderId);
 
         // Emit event for kitchen
         orderEvents.emit('new-order', {
@@ -110,10 +110,10 @@ router.post('/', (req, res) => {
 // ─── Get order (public - customer) ────────────────────────────
 
 // GET /api/orders/:id?token=<table_token>
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const { token } = req.query;
-        const order = db.prepare(
+        const order = await db.prepare(
             `SELECT o.id, o.table_id, o.public_status, o.payment_mode, o.total_amount, o.created_at,
               t.table_number
        FROM orders o
@@ -125,18 +125,18 @@ router.get('/:id', (req, res) => {
 
         // If token provided, validate it matches the table
         if (token) {
-            const table = db.prepare('SELECT id FROM tables WHERE qr_token = ?').get(token);
+            const table = await db.prepare('SELECT id FROM tables WHERE qr_token = ?').get(token);
             if (!table || table.id !== order.table_id) {
                 return res.status(403).json({ error: 'Access denied' });
             }
         }
 
-        const items = db.prepare(
+        const items = await db.prepare(
             'SELECT item_name, quantity, price_at_order, notes FROM order_items WHERE order_id = ?'
         ).all(req.params.id);
 
         // Check payment status
-        const payment = db.prepare(
+        const payment = await db.prepare(
             'SELECT status, verified FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1'
         ).get(req.params.id);
 
@@ -159,9 +159,9 @@ router.get('/:id', (req, res) => {
 // ─── Kitchen feed ─────────────────────────────────────────────
 
 // GET /api/orders/feed/kitchen
-router.get('/feed/kitchen', authenticateToken, requireRole('kitchen', 'admin'), (req, res) => {
+router.get('/feed/kitchen', authenticateToken, requireRole('kitchen', 'admin'), async (req, res) => {
     try {
-        const orders = db.prepare(
+        const orders = await db.prepare(
             `SELECT o.*, t.table_number
        FROM orders o
        JOIN tables t ON o.table_id = t.id
@@ -169,12 +169,12 @@ router.get('/feed/kitchen', authenticateToken, requireRole('kitchen', 'admin'), 
        ORDER BY o.created_at ASC`
         ).all(req.user.restaurant_id);
 
-        const result = orders.map(order => {
-            const items = db.prepare(
+        const result = await Promise.all(orders.map(async order => {
+            const items = await db.prepare(
                 'SELECT item_name, quantity, price_at_order, notes FROM order_items WHERE order_id = ?'
             ).all(order.id);
             return { ...order, items };
-        });
+        }));
 
         res.json(result);
     } catch (err) {
@@ -186,9 +186,9 @@ router.get('/feed/kitchen', authenticateToken, requireRole('kitchen', 'admin'), 
 // ─── Waiter feed ──────────────────────────────────────────────
 
 // GET /api/orders/feed/waiter
-router.get('/feed/waiter', authenticateToken, requireRole('waiter', 'admin'), (req, res) => {
+router.get('/feed/waiter', authenticateToken, requireRole('waiter', 'admin'), async (req, res) => {
     try {
-        const orders = db.prepare(
+        const orders = await db.prepare(
             `SELECT o.*, t.table_number
        FROM orders o
        JOIN tables t ON o.table_id = t.id
@@ -196,8 +196,8 @@ router.get('/feed/waiter', authenticateToken, requireRole('waiter', 'admin'), (r
        ORDER BY o.updated_at ASC`
         ).all(req.user.restaurant_id);
 
-        const result = orders.map(order => {
-            const items = db.prepare(
+        const result = await Promise.all(orders.map(async order => {
+            const items = await db.prepare(
                 'SELECT item_name, quantity, price_at_order, notes FROM order_items WHERE order_id = ?'
             ).all(order.id);
             return { ...order, items };
@@ -213,7 +213,7 @@ router.get('/feed/waiter', authenticateToken, requireRole('waiter', 'admin'), (r
 // ─── Admin: all orders ────────────────────────────────────────
 
 // GET /api/orders/feed/all
-router.get('/feed/all', authenticateToken, requireRole('admin'), (req, res) => {
+router.get('/feed/all', authenticateToken, requireRole('admin'), async (req, res) => {
     try {
         const { date, status } = req.query;
         let query = `SELECT o.*, t.table_number FROM orders o JOIN tables t ON o.table_id = t.id WHERE o.restaurant_id = ?`;
@@ -230,16 +230,16 @@ router.get('/feed/all', authenticateToken, requireRole('admin'), (req, res) => {
 
         query += ` ORDER BY o.created_at DESC LIMIT 100`;
 
-        const orders = db.prepare(query).all(...params);
-        const result = orders.map(order => {
-            const items = db.prepare(
+        const orders = await db.prepare(query).all(...params);
+        const result = await Promise.all(orders.map(async order => {
+            const items = await db.prepare(
                 'SELECT item_name, quantity, price_at_order, notes FROM order_items WHERE order_id = ?'
             ).all(order.id);
-            const payment = db.prepare(
+            const payment = await db.prepare(
                 'SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC LIMIT 1'
             ).get(order.id);
             return { ...order, items, payment };
-        });
+        }));
 
         res.json(result);
     } catch (err) {
@@ -251,7 +251,7 @@ router.get('/feed/all', authenticateToken, requireRole('admin'), (req, res) => {
 // ─── Update order status ──────────────────────────────────────
 
 // PATCH /api/orders/:id/status
-router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 'admin'), (req, res) => {
+router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 'admin'), async (req, res) => {
     try {
         const { internal_status } = req.body;
 
@@ -259,7 +259,7 @@ router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 
             return res.status(400).json({ error: 'Invalid status' });
         }
 
-        const order = db.prepare(
+        const order = await db.prepare(
             'SELECT * FROM orders WHERE id = ? AND restaurant_id = ?'
         ).get(req.params.id, req.user.restaurant_id);
 
@@ -277,7 +277,7 @@ router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 
 
         const public_status = STATUS_MAP[internal_status];
 
-        db.prepare(
+        await db.prepare(
             `UPDATE orders SET internal_status = ?, public_status = ?, updated_at = datetime('now') WHERE id = ?`
         ).run(internal_status, public_status, req.params.id);
 
@@ -287,7 +287,7 @@ router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 
             order_id: parseInt(req.params.id),
             internal_status,
             public_status,
-            table_number: db.prepare('SELECT table_number FROM tables WHERE id = ?').get(order.table_id)?.table_number
+            table_number: (await db.prepare('SELECT table_number FROM tables WHERE id = ?').get(order.table_id))?.table_number
         });
 
         res.json({ success: true, internal_status, public_status });
@@ -299,12 +299,12 @@ router.patch('/:id/status', authenticateToken, requireRole('kitchen', 'waiter', 
 
 // ─── Helper ───────────────────────────────────────────────────
 
-function getOrderById(orderId) {
-    const order = db.prepare(
+async function getOrderById(orderId) {
+    const order = await db.prepare(
         `SELECT o.*, t.table_number FROM orders o JOIN tables t ON o.table_id = t.id WHERE o.id = ?`
     ).get(orderId);
     if (!order) return null;
-    order.items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId);
+    order.items = await db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId);
     return order;
 }
 
