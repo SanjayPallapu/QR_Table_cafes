@@ -187,19 +187,89 @@
         const item = allItems.find(i => i.id === itemId);
         if (!item) return;
 
-        state.cart.push({
-            menu_item_id: item.id,
-            name: item.name,
-            price: item.price,
-            quantity: 1,
-            notes: '',
-            is_veg: item.is_veg
-        });
+        // Parse customizations
+        let custs = [];
+        try {
+            custs = typeof item.customizations === 'string' ? JSON.parse(item.customizations || '[]') : (item.customizations || []);
+        } catch (e) { custs = []; }
 
-        updateCartUI();
-        refreshMenuItem(itemId);
-        showToast(`${item.name} added`, 'success');
+        if (custs.length > 0) {
+            // Show customization modal
+            showCustomizationModal(item, custs);
+        } else {
+            // Add directly
+            state.cart.push({
+                menu_item_id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: 1,
+                notes: '',
+                is_veg: item.is_veg,
+                customization: ''
+            });
+            updateCartUI();
+            refreshMenuItem(itemId);
+            showToast(`${item.name} added`, 'success');
+        }
     };
+
+    function showCustomizationModal(item, custs) {
+        const overlay = document.createElement('div');
+        overlay.className = 'cart-overlay open';
+        overlay.style.zIndex = '1100';
+        overlay.innerHTML = `
+            <div class="cart-drawer" onclick="event.stopPropagation()" style="max-height:60vh">
+                <div class="cart-handle"></div>
+                <div class="cart-header">
+                    <h2 class="cart-title">Customize ${item.name}</h2>
+                    <button class="cart-clear" id="cust-close">✕</button>
+                </div>
+                <div class="cart-items" style="padding:16px">
+                    ${custs.map((c, i) => `
+                        <div style="margin-bottom:14px">
+                            <div style="font-weight:600;font-size:0.88rem;margin-bottom:6px">${c.name}</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                                ${(c.options || []).map((opt, oi) => `
+                                    <button class="filter-toggle cust-opt" data-cust="${i}" data-opt="${oi}" ${oi === 0 ? 'style="background:var(--accent-glow);border-color:var(--accent);color:var(--accent)"' : ''}
+                                        onclick="this.parentElement.querySelectorAll('.cust-opt').forEach(b=>{b.style.background='';b.style.borderColor='';b.style.color=''});this.style.background='var(--accent-glow)';this.style.borderColor='var(--accent)';this.style.color='var(--accent)'">${opt}</button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="cart-footer">
+                    <button class="btn btn-primary" id="cust-add">Add to Cart — ₹${item.price}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        overlay.querySelector('#cust-close').onclick = () => overlay.remove();
+        overlay.querySelector('#cust-add').onclick = () => {
+            // Collect selections
+            const selections = custs.map((c, i) => {
+                const btns = overlay.querySelectorAll(`[data-cust="${i}"]`);
+                let selected = c.options[0]; // default to first
+                btns.forEach(b => {
+                    if (b.style.color === 'var(--accent)') selected = b.textContent.trim();
+                });
+                return `${c.name}: ${selected}`;
+            });
+            state.cart.push({
+                menu_item_id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: 1,
+                notes: '',
+                is_veg: item.is_veg,
+                customization: selections.join(', ')
+            });
+            updateCartUI();
+            refreshMenuItem(item.id);
+            overlay.remove();
+            showToast(`${item.name} added`, 'success');
+        };
+    }
 
     window.updateQty = function (itemId, delta) {
         const idx = state.cart.findIndex(c => c.menu_item_id === itemId);
@@ -276,6 +346,7 @@
         <div class="${item.is_veg ? 'veg-badge' : 'nonveg-badge'}" style="margin-top:4px"></div>
         <div class="cart-item-info">
           <div class="cart-item-name">${item.name}</div>
+          ${item.customization ? `<div style="font-size:0.72rem;color:var(--accent);margin-top:2px">⚙️ ${item.customization}</div>` : ''}
           <input class="note-input" type="text" placeholder="Add note (e.g., less spicy, no onion)"
             value="${item.notes}" onchange="updateNote(${idx}, this.value)" onclick="event.stopPropagation()">
           ${item.notes ? `<div class="cart-item-notes">📝 ${item.notes}</div>` : ''}
