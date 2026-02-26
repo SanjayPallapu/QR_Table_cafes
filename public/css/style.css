@@ -857,6 +857,10 @@ body {
   background: var(--success);
 }
 
+.status-step.active::before {
+  background: var(--success);
+}
+
 .status-text {
   padding-top: 4px;
 }

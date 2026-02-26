@@ -801,6 +801,43 @@
         }
     };
 
+    window.payByCash = async function () {
+        if (!state.currentOrderId) {
+            showToast('No order to pay for', 'error');
+            return;
+        }
+
+        const cashBtn = document.querySelector('#pay-bill-section .btn-success');
+        if (cashBtn) { cashBtn.disabled = true; cashBtn.textContent = 'Processing...'; }
+
+        try {
+            const resp = await fetch('/api/payments/pay-cash', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    table_token: state.token,
+                    order_id: state.currentOrderId
+                })
+            });
+
+            const result = await resp.json();
+
+            if (result.success) {
+                // Fetch full order for receipt
+                const orderResp = await fetch(`/api/orders/${state.currentOrderId}?token=${state.token}`);
+                const order = await orderResp.json();
+                showReceiptView(order, 'Cash');
+            } else {
+                showToast(result.error || 'Failed to record cash payment', 'error');
+                if (cashBtn) { cashBtn.disabled = false; cashBtn.textContent = '💵 Paid by Cash'; }
+            }
+        } catch (err) {
+            console.error('Cash payment error:', err);
+            showToast('Something went wrong. Please try again.', 'error');
+            if (cashBtn) { cashBtn.disabled = false; cashBtn.textContent = '💵 Paid by Cash'; }
+        }
+    };
+
     window.goBackToMenu = async function () {
         if (state.sseConnection) {
             state.sseConnection.close();

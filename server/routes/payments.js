@@ -247,6 +247,54 @@ router.post('/verify', async (req, res) => {
     }
 });
 
+// ─── Pay by Cash (Postpaid) ───────────────────────────────────
+
+// POST /api/payments/pay-cash
+router.post('/pay-cash', async (req, res) => {
+    try {
+        const { table_token, order_id } = req.body;
+
+        if (!table_token || !order_id) {
+            return res.status(400).json({ error: 'table_token and order_id are required' });
+        }
+
+        // Validate table
+        const table = await db.prepare(
+            'SELECT id, restaurant_id FROM tables WHERE qr_token = ? AND active = 1'
+        ).get(table_token);
+        if (!table) return res.status(404).json({ error: 'Invalid table' });
+
+        // Get order
+        const order = await db.prepare(
+            'SELECT * FROM orders WHERE id = ? AND table_id = ? AND payment_mode = ?'
+        ).get(order_id, table.id, 'POSTPAID');
+        if (!order) return res.status(404).json({ error: 'Postpaid order not found for this table' });
+
+        // Check if already paid
+        const existingPayment = await db.prepare(
+            'SELECT id FROM payments WHERE order_id = ? AND verified = 1'
+        ).get(order_id);
+        if (existingPayment) {
+            return res.status(400).json({ error: 'Order already paid' });
+        }
+
+        // Create a cash payment record
+        await db.prepare(
+            `INSERT INTO payments (restaurant_id, order_id, razorpay_order_id, amount, payment_mode, status, verified)
+             VALUES (?, ?, ?, ?, 'POSTPAID', 'paid', 1)`
+        ).run(table.restaurant_id, order_id, 'cash_' + Date.now(), order.total_amount);
+
+        res.json({
+            success: true,
+            order_id: parseInt(order_id),
+            message: 'Cash payment recorded. Thank you!'
+        });
+    } catch (err) {
+        console.error('Cash payment error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 // ─── Admin: payment reports ───────────────────────────────────
 
 const { authenticateToken, requireRole } = require('../middleware/auth');
