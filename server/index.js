@@ -28,6 +28,7 @@ app.use('/api/menu', require('./routes/menu'));
 app.use('/api/tables', require('./routes/tables'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/feedback', require('./routes/feedback'));
 app.use('/api/sse', require('./routes/sse'));
 
 // ─── HTML Route Handlers ──────────────────────────────────────

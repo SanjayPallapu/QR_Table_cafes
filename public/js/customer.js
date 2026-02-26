@@ -14,7 +14,10 @@
         currentOrderId: null,
         sseConnection: null,
         vegOnly: false,
-        waiterCooldown: false
+        waiterCooldown: false,
+        feedbackRating: 0,
+        searchQuery: '',
+        deferredInstallPrompt: null
     };
 
     // ─── Init ────────────────────────────────────────────────
@@ -126,13 +129,42 @@
         const qty = cartItem ? cartItem.quantity : 0;
         const badge = item.is_veg ? '<div class="veg-badge"></div>' : '<div class="nonveg-badge"></div>';
 
+        // Image
+        const imageHtml = item.image_url
+            ? `<img class="item-image" src="${item.image_url}" alt="${item.name}" loading="lazy" onerror="this.style.display='none'">`
+            : '';
+
+        // Tags
+        let tagsHtml = '';
+        const tags = [];
+        if (item.is_bestseller) tags.push('<span class="item-tag bestseller">🔥 Bestseller</span>');
+        if (item.is_spicy) tags.push('<span class="item-tag spicy">🌶️ Spicy</span>');
+        if (item.allergen_tags) {
+            const allergens = (typeof item.allergen_tags === 'string' ? item.allergen_tags.split(',') : item.allergen_tags);
+            allergens.forEach(a => {
+                const t = a.trim().toLowerCase();
+                if (t === 'gluten-free') tags.push('<span class="item-tag gluten-free">🌾 GF</span>');
+                if (t === 'nut-free') tags.push('<span class="item-tag nut-free">🥜 NF</span>');
+                if (t === 'dairy-free') tags.push('<span class="item-tag dairy-free">🥛 DF</span>');
+            });
+        }
+        if (tags.length) tagsHtml = `<div class="item-tags">${tags.join('')}</div>`;
+
+        // Prep time
+        const prepHtml = item.prep_time_mins
+            ? `<div class="prep-time">⏱️ ${item.prep_time_mins} min</div>`
+            : '';
+
         return `
       <div class="menu-item" id="menu-item-${item.id}">
         ${badge}
         <div class="item-details">
           <div class="item-name">${item.name}</div>
-          <div class="item-description">${item.description}</div>
+          <div class="item-description">${item.description || ''}</div>
+          ${tagsHtml}
+          ${prepHtml}
         </div>
+        ${imageHtml}
         <div class="item-actions">
           <div class="item-price">₹${item.price}</div>
           ${qty === 0
@@ -936,23 +968,7 @@
         state.vegOnly = !state.vegOnly;
         const btn = document.getElementById('veg-filter');
         btn.classList.toggle('active', state.vegOnly);
-
-        // Filter visible items
-        document.querySelectorAll('.menu-item').forEach(el => {
-            const id = parseInt(el.id.replace('menu-item-', ''));
-            const allItems = state.menu.categories.flatMap(c => c.items);
-            const item = allItems.find(i => i.id === id);
-            if (item) {
-                el.style.display = (state.vegOnly && !item.is_veg) ? 'none' : '';
-            }
-        });
-
-        // Hide sections that have no visible items
-        document.querySelectorAll('.menu-section').forEach(section => {
-            const visibleItems = section.querySelectorAll('.menu-item:not([style*="display: none"])');
-            section.style.display = visibleItems.length === 0 ? 'none' : '';
-        });
-
+        applyFilters();
         showToast(state.vegOnly ? 'Showing veg items only' : 'Showing all items', 'info');
     };
 
@@ -989,5 +1005,203 @@
             state.waiterCooldown = false;
         }, 30000);
     };
+    // ─── Search ──────────────────────────────────────────────
+
+    window.searchMenu = function (query) {
+        state.searchQuery = query.toLowerCase().trim();
+        const clearBtn = document.getElementById('search-clear');
+        if (state.searchQuery) {
+            clearBtn.classList.remove('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+        }
+        applyFilters();
+    };
+
+    window.clearSearch = function () {
+        document.getElementById('search-input').value = '';
+        state.searchQuery = '';
+        document.getElementById('search-clear').classList.add('hidden');
+        applyFilters();
+    };
+
+    function applyFilters() {
+        const allItems = state.menu.categories.flatMap(c => c.items);
+        document.querySelectorAll('.menu-item').forEach(el => {
+            const id = parseInt(el.id.replace('menu-item-', ''));
+            const item = allItems.find(i => i.id === id);
+            if (!item) return;
+
+            let visible = true;
+            if (state.vegOnly && !item.is_veg) visible = false;
+            if (state.searchQuery) {
+                const nameMatch = item.name.toLowerCase().includes(state.searchQuery);
+                const descMatch = (item.description || '').toLowerCase().includes(state.searchQuery);
+                if (!nameMatch && !descMatch) visible = false;
+            }
+            el.style.display = visible ? '' : 'none';
+        });
+
+        // Hide empty sections
+        document.querySelectorAll('.menu-section').forEach(section => {
+            const visibleItems = section.querySelectorAll('.menu-item:not([style*="display: none"])');
+            section.style.display = visibleItems.length === 0 ? 'none' : '';
+        });
+    }
+
+    // ─── Theme Toggle ───────────────────────────────────────
+
+    window.toggleTheme = function () {
+        const isLight = document.body.classList.toggle('light-theme');
+        const icon = document.getElementById('theme-icon');
+        const toggle = document.getElementById('theme-toggle');
+        if (isLight) {
+            icon.textContent = '🌙';
+            toggle.childNodes[toggle.childNodes.length - 1].textContent = ' Dark';
+            localStorage.setItem('qr-theme', 'light');
+        } else {
+            icon.textContent = '☀️';
+            toggle.childNodes[toggle.childNodes.length - 1].textContent = ' Light';
+            localStorage.setItem('qr-theme', 'dark');
+        }
+    };
+
+    // Load saved theme
+    if (localStorage.getItem('qr-theme') === 'light') {
+        document.body.classList.add('light-theme');
+        setTimeout(() => {
+            const icon = document.getElementById('theme-icon');
+            const toggle = document.getElementById('theme-toggle');
+            if (icon) { icon.textContent = '🌙'; }
+            if (toggle) { toggle.childNodes[toggle.childNodes.length - 1].textContent = ' Dark'; }
+        }, 0);
+    }
+
+    // ─── Feedback / Rating ───────────────────────────────────
+
+    window.setRating = function (rating) {
+        state.feedbackRating = rating;
+        const stars = document.querySelectorAll('#feedback-stars .star');
+        stars.forEach((star, i) => {
+            if (i < rating) {
+                star.textContent = '★';
+                star.classList.add('filled');
+            } else {
+                star.textContent = '☆';
+                star.classList.remove('filled');
+            }
+        });
+    };
+
+    window.submitFeedback = async function () {
+        if (state.feedbackRating === 0) {
+            showToast('Please select a rating first', 'info');
+            return;
+        }
+
+        const btn = document.getElementById('feedback-btn');
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        const comment = document.getElementById('feedback-comment').value;
+
+        try {
+            await fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    table_token: state.token,
+                    order_id: state.currentOrderId,
+                    rating: state.feedbackRating,
+                    comment: comment
+                })
+            });
+            btn.textContent = '✓ Thank You!';
+            btn.style.background = 'var(--success)';
+            showToast('Thank you for your feedback! 🙏', 'success');
+        } catch (err) {
+            console.error('Feedback error:', err);
+            btn.disabled = false;
+            btn.textContent = 'Submit Feedback';
+            showToast('Could not submit feedback', 'error');
+        }
+    };
+
+    // ─── Browser Notifications ───────────────────────────────
+
+    function requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    }
+
+    function sendNotification(title, body) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                new Notification(title, {
+                    body: body,
+                    icon: '🍽️',
+                    badge: '🍽️',
+                    vibrate: [200, 100, 200]
+                });
+            } catch (e) {
+                // Notifications not supported in this context
+            }
+        }
+    }
+
+    // Request permission after first interaction
+    document.addEventListener('click', function requestOnce() {
+        requestNotificationPermission();
+        document.removeEventListener('click', requestOnce);
+    });
+
+    // ─── PWA Install Prompt ──────────────────────────────────
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        state.deferredInstallPrompt = e;
+
+        // Check if user has dismissed before
+        if (localStorage.getItem('qr-install-dismissed')) return;
+
+        // Show install banner after a delay
+        setTimeout(() => {
+            const banner = document.createElement('div');
+            banner.className = 'install-banner';
+            banner.id = 'install-banner';
+            banner.innerHTML = `
+                <div class="install-banner-text">
+                    📱 Add to Home Screen
+                    <small>Quick access for your next visit</small>
+                </div>
+                <button class="btn btn-primary" onclick="installPWA()">Install</button>
+                <button class="install-dismiss" onclick="dismissInstall()">✕</button>
+            `;
+            document.body.appendChild(banner);
+        }, 5000);
+    });
+
+    window.installPWA = async function () {
+        if (!state.deferredInstallPrompt) return;
+        state.deferredInstallPrompt.prompt();
+        const { outcome } = await state.deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+            showToast('App installed! 🎉', 'success');
+        }
+        state.deferredInstallPrompt = null;
+        document.getElementById('install-banner')?.remove();
+    };
+
+    window.dismissInstall = function () {
+        document.getElementById('install-banner')?.remove();
+        localStorage.setItem('qr-install-dismissed', '1');
+    };
+
+    // ─── Service Worker Registration ─────────────────────────
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => { });
+    }
 
 })();

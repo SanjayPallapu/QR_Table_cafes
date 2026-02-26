@@ -1255,3 +1255,268 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* ─── Search Bar ───────────────────────────────────────────── */
+
+.search-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 95;
+  padding: 8px 16px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  transition: all var(--transition);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+
+.search-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+/* ─── Feedback / Rating ────────────────────────────────────── */
+
+.feedback-stars {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.feedback-stars .star {
+  font-size: 2rem;
+  cursor: pointer;
+  transition: all var(--transition-spring);
+  user-select: none;
+}
+
+.feedback-stars .star:hover {
+  transform: scale(1.2);
+}
+
+.feedback-stars .star.filled {
+  color: var(--warning);
+}
+
+.feedback-textarea {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  resize: none;
+  transition: border-color var(--transition);
+}
+
+.feedback-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.feedback-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ─── Allergen / Dietary Tags ──────────────────────────────── */
+
+.item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.item-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.item-tag.gluten-free {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.item-tag.nut-free {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+}
+
+.item-tag.dairy-free {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+}
+
+.item-tag.spicy {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+}
+
+.item-tag.bestseller {
+  background: rgba(232, 168, 56, 0.15);
+  color: var(--accent);
+}
+
+/* ─── Menu Item Image ──────────────────────────────────────── */
+
+.item-image {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* ─── Prep Time Badge ──────────────────────────────────────── */
+
+.prep-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+/* ─── Light Theme ──────────────────────────────────────────── */
+
+body.light-theme {
+  --bg-primary: #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0f0f5;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
+  --accent: #d4920a;
+  --accent-light: #e8a838;
+  --accent-dark: #b87a08;
+  --accent-glow: rgba(212, 146, 10, 0.12);
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #5a5a72;
+  --text-muted: #8a8a9e;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-active: rgba(212, 146, 10, 0.3);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+}
+
+/* ─── PWA Install Prompt ───────────────────────────────────── */
+
+.install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: slideUp 0.4s ease-out;
+}
+
+.install-banner-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.install-banner-text small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.install-banner .btn {
+  width: auto;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.install-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}

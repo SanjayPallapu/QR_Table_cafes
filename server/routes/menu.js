@@ -20,7 +20,7 @@ router.get('/:restaurantId', async (req, res) => {
         ).all(restaurantId);
 
         const items = await db.prepare(
-            'SELECT id, category_id, name, description, price, image_url, is_veg, sort_order FROM menu_items WHERE restaurant_id = ? AND active = 1 ORDER BY sort_order'
+            'SELECT id, category_id, name, description, price, image_url, is_veg, is_bestseller, is_spicy, allergen_tags, prep_time_mins, sort_order FROM menu_items WHERE restaurant_id = ? AND active = 1 ORDER BY sort_order'
         ).all(restaurantId);
 
         // Group items by category
