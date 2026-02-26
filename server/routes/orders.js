@@ -9,7 +9,7 @@ const STATUS_MAP = {
     'PLACED': 'Order placed',
     'PREPARING': 'Being prepared',
     'READY': 'Almost ready',
-    'SERVED': 'Almost ready'  // Customer never sees READY or SERVED
+    'SERVED': 'Served'
 };
 
 // ─── Create Order (Postpaid or after Prepaid verification) ────

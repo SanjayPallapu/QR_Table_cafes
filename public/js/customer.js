@@ -610,6 +610,10 @@
             'Almost ready': {
                 icon: '✨',
                 message: 'Your order is almost ready. Our waiter will bring it to your table soon.'
+            },
+            'Served': {
+                icon: '🍽️',
+                message: 'Your order has been served. Enjoy your meal!'
             }
         };
 
@@ -619,7 +623,7 @@
         messageEl.textContent = config.message;
 
         // Status steps
-        const steps = ['Order placed', 'Being prepared', 'Almost ready'];
+        const steps = ['Order placed', 'Being prepared', 'Almost ready', 'Served'];
         const currentIdx = steps.indexOf(status);
         const stepsHtml = steps.map((step, i) => {
             let cls = '';
@@ -651,7 +655,7 @@
             document.getElementById('pay-bill-amount').textContent = order.total_amount;
             show('pay-bill-section');
             // Hide order-more if order was served (ready to pay)
-            if (order.internal_status === 'SERVED' || order.public_status === 'Almost ready') {
+            if (order.public_status === 'Served') {
                 hide('order-more-section');
             } else {
                 show('order-more-section');
