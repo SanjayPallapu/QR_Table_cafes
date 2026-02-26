@@ -25,14 +25,31 @@
     </header>
 
     <nav class="admin-tabs" id="admin-tabs">
-        <button class="admin-tab active" data-tab="menu" onclick="switchTab('menu')">📋 Menu</button>
-        <button class="admin-tab" data-tab="tables" onclick="switchTab('tables')">🪑 Tables & QR</button>
+        <button class="admin-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</button>
+        <button class="admin-tab" data-tab="menu" onclick="switchTab('menu')">📋 Menu</button>
+        <button class="admin-tab" data-tab="tables" onclick="switchTab('tables')">🪑 Tables</button>
         <button class="admin-tab" data-tab="orders" onclick="switchTab('orders')">📦 Orders</button>
+        <button class="admin-tab" data-tab="feedback" onclick="switchTab('feedback')">⭐ Reviews</button>
         <button class="admin-tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Settings</button>
     </nav>
 
+    <!-- Dashboard Tab -->
+    <div class="admin-content" id="tab-dashboard">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">📊 Today's Dashboard</h2>
+        <div id="dashboard-stats" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+        </div>
+        <div id="dashboard-top-items">
+            <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:10px">🔥 Top Selling Items</h3>
+            <div id="top-items-list"></div>
+        </div>
+        <div id="dashboard-recent-feedback" style="margin-top:20px">
+            <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:10px">⭐ Recent Reviews</h3>
+            <div id="recent-feedback-list"></div>
+        </div>
+    </div>
+
     <!-- Menu Tab -->
-    <div class="admin-content" id="tab-menu">
+    <div class="admin-content hidden" id="tab-menu">
         <div
             style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
             <h2 style="font-size:1.1rem;font-weight:700">Menu Management</h2>
@@ -50,6 +67,7 @@
             <h2 style="font-size:1.1rem;font-weight:700">Tables & QR Codes</h2>
             <button class="btn btn-primary btn-sm" onclick="showAddTableModal()">+ Add Table</button>
         </div>
+        <div id="table-status-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
         <div id="tables-content"></div>
     </div>
 
@@ -72,6 +90,14 @@
             </div>
         </div>
         <div id="orders-content"></div>
+    </div>
+
+    <!-- Feedback Tab -->
+    <div class="admin-content hidden" id="tab-feedback">
+        <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">⭐ Customer Feedback</h2>
+        <div id="feedback-summary" style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px">
+        </div>
+        <div id="feedback-list"></div>
     </div>
 
     <!-- Settings Tab -->

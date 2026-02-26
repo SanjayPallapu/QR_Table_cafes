@@ -1,65 +1,68 @@
 // ─── Admin Panel JS ───────────────────────────────────────────
 
 (function () {
-    'use strict';
+  'use strict';
 
-    const token = localStorage.getItem('staff_token');
-    const user = JSON.parse(localStorage.getItem('staff_user') || 'null');
+  const token = localStorage.getItem('staff_token');
+  const user = JSON.parse(localStorage.getItem('staff_user') || 'null');
 
-    if (!token || !user || user.role !== 'admin') {
-        window.location.href = '/staff';
-        return;
-    }
+  if (!token || !user || user.role !== 'admin') {
+    window.location.href = '/staff';
+    return;
+  }
 
-    document.getElementById('admin-name').textContent = user.name || 'Administrator';
+  document.getElementById('admin-name').textContent = user.name || 'Administrator';
 
-    let menuData = null;
-    let tables = [];
-    let currentTab = 'menu';
+  let menuData = null;
+  let tables = [];
+  let currentTab = 'dashboard';
 
-    // ─── Init ────────────────────────────────────────────────
+  // ─── Init ────────────────────────────────────────────────
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadMenu();
-        loadTables();
-        // Set today's date for orders filter
-        document.getElementById('orders-date').value = new Date().toISOString().split('T')[0];
+  document.addEventListener('DOMContentLoaded', () => {
+    loadMenu();
+    loadTables();
+    loadDashboard();
+    // Set today's date for orders filter
+    document.getElementById('orders-date').value = new Date().toISOString().split('T')[0];
+  });
+
+  // ─── Tab Switching ───────────────────────────────────────
+
+  window.switchTab = function (tab) {
+    currentTab = tab;
+    document.querySelectorAll('.admin-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
     });
+    document.querySelectorAll('.admin-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById(`tab-${tab}`).classList.remove('hidden');
 
-    // ─── Tab Switching ───────────────────────────────────────
+    if (tab === 'dashboard') loadDashboard();
+    if (tab === 'orders') loadOrders();
+    if (tab === 'feedback') loadFeedbackTab();
+    if (tab === 'settings') loadSettings();
+  };
 
-    window.switchTab = function (tab) {
-        currentTab = tab;
-        document.querySelectorAll('.admin-tab').forEach(t => {
-            t.classList.toggle('active', t.dataset.tab === tab);
-        });
-        document.querySelectorAll('.admin-content').forEach(c => c.classList.add('hidden'));
-        document.getElementById(`tab-${tab}`).classList.remove('hidden');
+  // ─── Menu Management ────────────────────────────────────
 
-        if (tab === 'orders') loadOrders();
-        if (tab === 'settings') loadSettings();
-    };
+  async function loadMenu() {
+    try {
+      const resp = await fetch(`/api/menu/${user.restaurant_id}`);
+      menuData = await resp.json();
+      renderMenuAdmin();
+    } catch (err) {
+      console.error('Load menu error:', err);
+    }
+  }
 
-    // ─── Menu Management ────────────────────────────────────
-
-    async function loadMenu() {
-        try {
-            const resp = await fetch(`/api/menu/${user.restaurant_id}`);
-            menuData = await resp.json();
-            renderMenuAdmin();
-        } catch (err) {
-            console.error('Load menu error:', err);
-        }
+  function renderMenuAdmin() {
+    const container = document.getElementById('menu-content');
+    if (!menuData || !menuData.categories.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div>No menu items yet. Add a category to get started.</div></div>';
+      return;
     }
 
-    function renderMenuAdmin() {
-        const container = document.getElementById('menu-content');
-        if (!menuData || !menuData.categories.length) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div>No menu items yet. Add a category to get started.</div></div>';
-            return;
-        }
-
-        container.innerHTML = menuData.categories.map(cat => `
+    container.innerHTML = menuData.categories.map(cat => `
       <div style="margin-bottom:24px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:8px 0;border-bottom:1px solid var(--border)">
           <div>
@@ -105,23 +108,23 @@
         </table>
       </div>
     `).join('');
+  }
+
+  window.toggleItem = async function (id, active) {
+    try {
+      await fetch(`/api/menu/items/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ active: active ? 1 : 0 })
+      });
+      showToast(`Item ${active ? 'enabled' : 'disabled'}`, 'success');
+    } catch (err) {
+      showToast('Failed to update', 'error');
     }
+  };
 
-    window.toggleItem = async function (id, active) {
-        try {
-            await fetch(`/api/menu/items/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ active: active ? 1 : 0 })
-            });
-            showToast(`Item ${active ? 'enabled' : 'disabled'}`, 'success');
-        } catch (err) {
-            showToast('Failed to update', 'error');
-        }
-    };
-
-    window.showAddCategoryModal = function () {
-        showModal('Add Category', `
+  window.showAddCategoryModal = function () {
+    showModal('Add Category', `
       <div class="form-group">
         <label class="form-label">Category Name</label>
         <input class="form-input" type="text" id="modal-cat-name" placeholder="e.g., Starters, Soups">
@@ -131,52 +134,52 @@
         <input class="form-input" type="number" id="modal-cat-order" value="0" min="0">
       </div>
     `, async () => {
-            const name = document.getElementById('modal-cat-name').value;
-            if (!name) return showToast('Name is required', 'error');
+      const name = document.getElementById('modal-cat-name').value;
+      if (!name) return showToast('Name is required', 'error');
 
-            await fetch('/api/menu/categories', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name, sort_order: parseInt(document.getElementById('modal-cat-order').value) || 0 })
-            });
+      await fetch('/api/menu/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name, sort_order: parseInt(document.getElementById('modal-cat-order').value) || 0 })
+      });
 
-            closeModal();
-            loadMenu();
-            showToast('Category added', 'success');
-        });
-    };
+      closeModal();
+      loadMenu();
+      showToast('Category added', 'success');
+    });
+  };
 
-    window.editCategory = function (id, name) {
-        showModal('Edit Category', `
+  window.editCategory = function (id, name) {
+    showModal('Edit Category', `
       <div class="form-group">
         <label class="form-label">Category Name</label>
         <input class="form-input" type="text" id="modal-cat-name" value="${name}">
       </div>
     `, async () => {
-            await fetch(`/api/menu/categories/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ name: document.getElementById('modal-cat-name').value })
-            });
-            closeModal();
-            loadMenu();
-            showToast('Category updated', 'success');
-        });
-    };
+      await fetch(`/api/menu/categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: document.getElementById('modal-cat-name').value })
+      });
+      closeModal();
+      loadMenu();
+      showToast('Category updated', 'success');
+    });
+  };
 
-    window.deleteCategory = async function (id) {
-        if (!confirm('Delete this category and all its items?')) return;
-        await fetch(`/api/menu/categories/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        loadMenu();
-        showToast('Category deleted', 'success');
-    };
+  window.deleteCategory = async function (id) {
+    if (!confirm('Delete this category and all its items?')) return;
+    await fetch(`/api/menu/categories/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    loadMenu();
+    showToast('Category deleted', 'success');
+  };
 
-    window.showAddItemModal = function () {
-        const catOptions = menuData.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-        showModal('Add Menu Item', `
+  window.showAddItemModal = function () {
+    const catOptions = menuData.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    showModal('Add Menu Item', `
       <div class="form-group">
         <label class="form-label">Category</label>
         <select class="form-input" id="modal-item-cat">${catOptions}</select>
@@ -203,34 +206,34 @@
         </div>
       </div>
     `, async () => {
-            const data = {
-                category_id: parseInt(document.getElementById('modal-item-cat').value),
-                name: document.getElementById('modal-item-name').value,
-                description: document.getElementById('modal-item-desc').value,
-                price: parseFloat(document.getElementById('modal-item-price').value),
-                is_veg: parseInt(document.getElementById('modal-item-veg').value)
-            };
+      const data = {
+        category_id: parseInt(document.getElementById('modal-item-cat').value),
+        name: document.getElementById('modal-item-name').value,
+        description: document.getElementById('modal-item-desc').value,
+        price: parseFloat(document.getElementById('modal-item-price').value),
+        is_veg: parseInt(document.getElementById('modal-item-veg').value)
+      };
 
-            if (!data.name || !data.price) return showToast('Name and price required', 'error');
+      if (!data.name || !data.price) return showToast('Name and price required', 'error');
 
-            await fetch('/api/menu/items', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(data)
-            });
-            closeModal();
-            loadMenu();
-            showToast('Item added', 'success');
-        });
-    };
+      await fetch('/api/menu/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(data)
+      });
+      closeModal();
+      loadMenu();
+      showToast('Item added', 'success');
+    });
+  };
 
-    window.editItem = function (item) {
-        if (typeof item === 'string') item = JSON.parse(item);
-        const catOptions = menuData.categories.map(c =>
-            `<option value="${c.id}" ${c.id === item.category_id ? 'selected' : ''}>${c.name}</option>`
-        ).join('');
+  window.editItem = function (item) {
+    if (typeof item === 'string') item = JSON.parse(item);
+    const catOptions = menuData.categories.map(c =>
+      `<option value="${c.id}" ${c.id === item.category_id ? 'selected' : ''}>${c.name}</option>`
+    ).join('');
 
-        showModal('Edit Menu Item', `
+    showModal('Edit Menu Item', `
       <div class="form-group">
         <label class="form-label">Category</label>
         <select class="form-input" id="modal-item-cat">${catOptions}</select>
@@ -257,45 +260,45 @@
         </div>
       </div>
     `, async () => {
-            await fetch(`/api/menu/items/${item.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    category_id: parseInt(document.getElementById('modal-item-cat').value),
-                    name: document.getElementById('modal-item-name').value,
-                    description: document.getElementById('modal-item-desc').value,
-                    price: parseFloat(document.getElementById('modal-item-price').value),
-                    is_veg: parseInt(document.getElementById('modal-item-veg').value)
-                })
-            });
-            closeModal();
-            loadMenu();
-            showToast('Item updated', 'success');
-        });
-    };
+      await fetch(`/api/menu/items/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          category_id: parseInt(document.getElementById('modal-item-cat').value),
+          name: document.getElementById('modal-item-name').value,
+          description: document.getElementById('modal-item-desc').value,
+          price: parseFloat(document.getElementById('modal-item-price').value),
+          is_veg: parseInt(document.getElementById('modal-item-veg').value)
+        })
+      });
+      closeModal();
+      loadMenu();
+      showToast('Item updated', 'success');
+    });
+  };
 
-    // ─── Tables Management ──────────────────────────────────
+  // ─── Tables Management ──────────────────────────────────
 
-    async function loadTables() {
-        try {
-            const resp = await fetch('/api/tables', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            tables = await resp.json();
-            renderTables();
-        } catch (err) {
-            console.error('Load tables error:', err);
-        }
+  async function loadTables() {
+    try {
+      const resp = await fetch('/api/tables', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      tables = await resp.json();
+      renderTables();
+    } catch (err) {
+      console.error('Load tables error:', err);
+    }
+  }
+
+  function renderTables() {
+    const container = document.getElementById('tables-content');
+    if (!tables.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🪑</div><div>No tables yet.</div></div>';
+      return;
     }
 
-    function renderTables() {
-        const container = document.getElementById('tables-content');
-        if (!tables.length) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🪑</div><div>No tables yet.</div></div>';
-            return;
-        }
-
-        container.innerHTML = `
+    container.innerHTML = `
       <table class="data-table">
         <thead>
           <tr>
@@ -312,9 +315,9 @@
               <td style="font-weight:700;font-size:1.1rem;color:var(--accent)">${t.table_number}</td>
               <td>${t.seats}</td>
               <td>${t.active
-                ? '<span style="color:var(--success);font-weight:600">Active</span>'
-                : '<span style="color:var(--text-muted);font-weight:600">Inactive</span>'
-            }</td>
+        ? '<span style="color:var(--success);font-weight:600">Active</span>'
+        : '<span style="color:var(--text-muted);font-weight:600">Inactive</span>'
+      }</td>
               <td>
                 <button class="btn btn-secondary btn-sm" onclick="showQR(${t.id})">📱 View QR</button>
               </td>
@@ -332,10 +335,10 @@
         </tbody>
       </table>
     `;
-    }
+  }
 
-    window.showAddTableModal = function () {
-        showModal('Add Table', `
+  window.showAddTableModal = function () {
+    showModal('Add Table', `
       <div class="form-group">
         <label class="form-label">Table Number</label>
         <input class="form-input" type="number" id="modal-table-num" min="1">
@@ -345,29 +348,29 @@
         <input class="form-input" type="number" id="modal-table-seats" value="4" min="1">
       </div>
     `, async () => {
-            const num = parseInt(document.getElementById('modal-table-num').value);
-            const seats = parseInt(document.getElementById('modal-table-seats').value);
-            if (!num) return showToast('Table number required', 'error');
+      const num = parseInt(document.getElementById('modal-table-num').value);
+      const seats = parseInt(document.getElementById('modal-table-seats').value);
+      if (!num) return showToast('Table number required', 'error');
 
-            const resp = await fetch('/api/tables', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ table_number: num, seats })
-            });
+      const resp = await fetch('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ table_number: num, seats })
+      });
 
-            if (resp.ok) {
-                closeModal();
-                loadTables();
-                showToast('Table added', 'success');
-            } else {
-                const data = await resp.json();
-                showToast(data.error || 'Failed', 'error');
-            }
-        });
-    };
+      if (resp.ok) {
+        closeModal();
+        loadTables();
+        showToast('Table added', 'success');
+      } else {
+        const data = await resp.json();
+        showToast(data.error || 'Failed', 'error');
+      }
+    });
+  };
 
-    window.editTable = function (id, num, seats) {
-        showModal('Edit Table', `
+  window.editTable = function (id, num, seats) {
+    showModal('Edit Table', `
       <div class="form-group">
         <label class="form-label">Table Number</label>
         <input class="form-input" type="number" id="modal-table-num" value="${num}" min="1">
@@ -377,37 +380,37 @@
         <input class="form-input" type="number" id="modal-table-seats" value="${seats}" min="1">
       </div>
     `, async () => {
-            await fetch(`/api/tables/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    table_number: parseInt(document.getElementById('modal-table-num').value),
-                    seats: parseInt(document.getElementById('modal-table-seats').value)
-                })
-            });
-            closeModal();
-            loadTables();
-            showToast('Table updated', 'success');
-        });
-    };
+      await fetch(`/api/tables/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          table_number: parseInt(document.getElementById('modal-table-num').value),
+          seats: parseInt(document.getElementById('modal-table-seats').value)
+        })
+      });
+      closeModal();
+      loadTables();
+      showToast('Table updated', 'success');
+    });
+  };
 
-    window.toggleTable = async function (id, active) {
-        await fetch(`/api/tables/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ active: active ? 1 : 0 })
-        });
-        showToast(`Table ${active ? 'activated' : 'deactivated'}`, 'success');
-    };
+  window.toggleTable = async function (id, active) {
+    await fetch(`/api/tables/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ active: active ? 1 : 0 })
+    });
+    showToast(`Table ${active ? 'activated' : 'deactivated'}`, 'success');
+  };
 
-    window.showQR = async function (tableId) {
-        try {
-            const resp = await fetch(`/api/tables/${tableId}/qr`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await resp.json();
+  window.showQR = async function (tableId) {
+    try {
+      const resp = await fetch(`/api/tables/${tableId}/qr`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await resp.json();
 
-            showModal(`QR Code — Table ${data.table_number}`, `
+      showModal(`QR Code — Table ${data.table_number}`, `
         <div class="qr-display">
           <img src="${data.qr_image}" class="qr-image" alt="QR Code for Table ${data.table_number}">
           <p style="font-weight:600;margin-bottom:4px">Table ${data.table_number}</p>
@@ -418,21 +421,21 @@
           </div>
         </div>
       `, null);
-        } catch (err) {
-            showToast('Failed to generate QR', 'error');
-        }
-    };
+    } catch (err) {
+      showToast('Failed to generate QR', 'error');
+    }
+  };
 
-    window.downloadQR = function (dataUrl, tableNum) {
-        const link = document.createElement('a');
-        link.download = `table-${tableNum}-qr.png`;
-        link.href = dataUrl;
-        link.click();
-    };
+  window.downloadQR = function (dataUrl, tableNum) {
+    const link = document.createElement('a');
+    link.download = `table-${tableNum}-qr.png`;
+    link.href = dataUrl;
+    link.click();
+  };
 
-    window.printQR = function (dataUrl, tableNum) {
-        const win = window.open('', '_blank');
-        win.document.write(`
+  window.printQR = function (dataUrl, tableNum) {
+    const win = window.open('', '_blank');
+    win.document.write(`
       <html><head><title>Table ${tableNum} QR</title></head>
       <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:Arial">
         <img src="${dataUrl}" style="width:300px">
@@ -441,36 +444,36 @@
         <script>setTimeout(()=>window.print(), 500)<\/script>
       </body></html>
     `);
-    };
+  };
 
-    // ─── Orders ──────────────────────────────────────────────
+  // ─── Orders ──────────────────────────────────────────────
 
-    window.loadOrders = async function () {
-        const date = document.getElementById('orders-date').value;
-        const status = document.getElementById('orders-status').value;
-        const params = new URLSearchParams();
-        if (date) params.set('date', date);
-        if (status) params.set('status', status);
+  window.loadOrders = async function () {
+    const date = document.getElementById('orders-date').value;
+    const status = document.getElementById('orders-status').value;
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (status) params.set('status', status);
 
-        try {
-            const resp = await fetch(`/api/orders/feed/all?${params}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const orders = await resp.json();
-            renderOrders(orders);
-        } catch (err) {
-            console.error('Load orders error:', err);
-        }
-    };
+    try {
+      const resp = await fetch(`/api/orders/feed/all?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const orders = await resp.json();
+      renderOrders(orders);
+    } catch (err) {
+      console.error('Load orders error:', err);
+    }
+  };
 
-    function renderOrders(orders) {
-        const container = document.getElementById('orders-content');
-        if (!orders.length) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><div>No orders found</div></div>';
-            return;
-        }
+  function renderOrders(orders) {
+    const container = document.getElementById('orders-content');
+    if (!orders.length) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><div>No orders found</div></div>';
+      return;
+    }
 
-        container.innerHTML = `
+    container.innerHTML = `
       <table class="data-table">
         <thead>
           <tr>
@@ -503,17 +506,136 @@
         </tbody>
       </table>
     `;
+  }
+  // ─── Dashboard Analytics ─────────────────────────────────
+
+  async function loadDashboard() {
+    try {
+      // Get today's orders for analytics
+      const today = new Date().toISOString().split('T')[0];
+      const [ordersResp, feedbackResp] = await Promise.all([
+        fetch(`/api/orders/feed/all?date=${today}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/feedback', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const orders = await ordersResp.json();
+      const fbData = await feedbackResp.json();
+
+      // Stats cards
+      const totalOrders = orders.length;
+      const totalRevenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0);
+      const avgOrder = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+      const avgRating = fbData.stats?.avg_rating || 'N/A';
+
+      document.getElementById('dashboard-stats').innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--accent)">${totalOrders}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Orders Today</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--success)">₹${totalRevenue}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Revenue Today</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--info)">₹${avgOrder}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Avg Order</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--warning)">⭐ ${avgRating}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Avg Rating</div>
+                </div>
+            `;
+
+      // Top selling items
+      const itemCounts = {};
+      orders.forEach(o => {
+        (o.items || []).forEach(i => {
+          itemCounts[i.item_name] = (itemCounts[i.item_name] || 0) + i.quantity;
+        });
+      });
+      const topItems = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      document.getElementById('top-items-list').innerHTML = topItems.length
+        ? topItems.map((item, idx) => `
+                    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+                        <span style="font-weight:600">${idx + 1}. ${item[0]}</span>
+                        <span style="color:var(--accent);font-weight:700">${item[1]} sold</span>
+                    </div>
+                `).join('')
+        : '<div style="color:var(--text-muted);font-size:0.85rem">No orders yet today</div>';
+
+      // Recent reviews
+      const recentFb = (fbData.feedbacks || []).slice(0, 3);
+      document.getElementById('recent-feedback-list').innerHTML = recentFb.length
+        ? recentFb.map(f => `
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="color:var(--warning);font-size:1.1rem">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</span>
+                            <span style="font-size:0.7rem;color:var(--text-muted)">Table ${f.table_number || '?'}</span>
+                        </div>
+                        ${f.comment ? `<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px">${f.comment}</div>` : ''}
+                    </div>
+                `).join('')
+        : '<div style="color:var(--text-muted);font-size:0.85rem">No feedback yet</div>';
+    } catch (err) {
+      console.error('Dashboard load error:', err);
     }
+  }
 
-    // ─── Settings ────────────────────────────────────────────
+  // ─── Feedback Tab ────────────────────────────────────────
 
-    async function loadSettings() {
-        try {
-            const resp = await fetch(`/api/menu/${user.restaurant_id}`);
-            const data = await resp.json();
-            const r = data.restaurant;
+  async function loadFeedbackTab() {
+    try {
+      const resp = await fetch('/api/feedback', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await resp.json();
 
-            document.getElementById('settings-content').innerHTML = `
+      // Summary
+      const s = data.stats || {};
+      document.getElementById('feedback-summary').innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--warning)">⭐ ${s.avg_rating || 'N/A'}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Average Rating</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--text-primary)">${s.total || 0}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Total Reviews</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--success)">${s.positive || 0}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Positive (4-5★)</div>
+                </div>
+                <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">
+                    <div style="font-size:2rem;font-weight:800;color:var(--danger)">${s.negative || 0}</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Negative (1-2★)</div>
+                </div>
+            `;
+
+      // Feedback list
+      const list = data.feedbacks || [];
+      document.getElementById('feedback-list').innerHTML = list.length
+        ? list.map(f => `
+                    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="color:var(--warning);font-size:1.1rem">${'★'.repeat(f.rating)}${'☆'.repeat(5 - f.rating)}</span>
+                            <span style="font-size:0.72rem;color:var(--text-muted)">Table ${f.table_number || '?'} · ${new Date(f.created_at).toLocaleDateString()}</span>
+                        </div>
+                        ${f.comment ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:6px">${f.comment}</div>` : ''}
+                        ${f.order_id ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">Order #${f.order_id}</div>` : ''}
+                    </div>
+                `).join('')
+        : '<div class="empty-state"><div class="empty-state-icon">⭐</div><div>No feedback yet</div></div>';
+    } catch (err) {
+      console.error('Feedback load error:', err);
+    }
+  }
+
+  // ─── Settings ────────────────────────────────────────────
+
+  async function loadSettings() {
+    try {
+      const resp = await fetch(`/api/menu/${user.restaurant_id}`);
+      const data = await resp.json();
+      const r = data.restaurant;
+
+      document.getElementById('settings-content').innerHTML = `
         <div style="max-width:500px">
           <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;margin-bottom:16px">
             <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:16px">Restaurant Info</h3>
@@ -563,20 +685,20 @@
           <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
         </div>
       `;
-        } catch (err) {
-            console.error('Load settings error:', err);
-        }
+    } catch (err) {
+      console.error('Load settings error:', err);
     }
+  }
 
-    window.saveSettings = async function () {
-        showToast('Settings saved (note: full restaurant settings update requires backend endpoint expansion)', 'info');
-    };
+  window.saveSettings = async function () {
+    showToast('Settings saved (note: full restaurant settings update requires backend endpoint expansion)', 'info');
+  };
 
-    // ─── Modal System ────────────────────────────────────────
+  // ─── Modal System ────────────────────────────────────────
 
-    function showModal(title, body, onSave) {
-        const container = document.getElementById('modal-container');
-        container.innerHTML = `
+  function showModal(title, body, onSave) {
+    const container = document.getElementById('modal-container');
+    container.innerHTML = `
       <div class="modal-overlay" onclick="closeModal()">
         <div class="modal" onclick="event.stopPropagation()">
           <div class="modal-header">
@@ -598,32 +720,32 @@
       </div>
     `;
 
-        if (onSave) {
-            document.getElementById('modal-save-btn').addEventListener('click', onSave);
-        }
+    if (onSave) {
+      document.getElementById('modal-save-btn').addEventListener('click', onSave);
     }
+  }
 
-    window.closeModal = function () {
-        document.getElementById('modal-container').innerHTML = '';
-    };
+  window.closeModal = function () {
+    document.getElementById('modal-container').innerHTML = '';
+  };
 
-    // ─── Helpers ─────────────────────────────────────────────
+  // ─── Helpers ─────────────────────────────────────────────
 
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.textContent = message;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 3500);
-    }
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
 
-    window.logout = function () {
-        localStorage.removeItem('staff_token');
-        localStorage.removeItem('staff_user');
-        window.location.href = '/staff';
-    };
+  window.logout = function () {
+    localStorage.removeItem('staff_token');
+    localStorage.removeItem('staff_user');
+    window.location.href = '/staff';
+  };
 })();
