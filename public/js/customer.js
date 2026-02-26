@@ -279,9 +279,12 @@
         }
         optionsContainer.innerHTML = options;
 
-        // Update button text
+        // Update button text and re-enable it
         const btn = document.getElementById('place-order-btn');
-        if (state.paymentMode === 'PREPAID') {
+        btn.disabled = false;
+        if (state.addingToOrderId) {
+            btn.textContent = '🍽️ Add to Order';
+        } else if (state.paymentMode === 'PREPAID') {
             const total = state.cart.reduce((s, c) => s + (c.price * c.quantity), 0);
             btn.textContent = `💳 Pay ₹${total} & Place Order`;
         } else {
@@ -848,6 +851,10 @@
         }
         hide('tracking-view');
         hide('receipt-view');
+
+        // Re-enable the place order button (it may have been disabled from a previous order)
+        const btn = document.getElementById('place-order-btn');
+        if (btn) { btn.disabled = false; }
 
         // If menu was never loaded (page opened directly into tracking), load it now
         if (!state.menu) {

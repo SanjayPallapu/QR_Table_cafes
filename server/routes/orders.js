@@ -119,12 +119,9 @@ router.post('/:id/add-items', async (req, res) => {
         if (!table) return res.status(404).json({ error: 'Invalid table' });
 
         const order = await db.prepare(
-            'SELECT id, total_amount, internal_status FROM orders WHERE id = ? AND table_id = ? AND payment_mode = ?'
-        ).get(orderId, table.id, 'POSTPAID');
+            'SELECT id, total_amount, internal_status, payment_mode FROM orders WHERE id = ? AND table_id = ?'
+        ).get(orderId, table.id);
         if (!order) return res.status(404).json({ error: 'Order not found' });
-        if (order.internal_status === 'SERVED') {
-            return res.status(400).json({ error: 'Cannot add items to a served order' });
-        }
 
         // Validate and price new items
         let additionalAmount = 0;
@@ -152,15 +149,19 @@ router.post('/:id/add-items', async (req, res) => {
             ).run(orderId, oi.menu_item_id, oi.item_name, oi.quantity, oi.price_at_order, oi.notes);
         }
 
-        // Update order total
+        // Update order total and reset status to PLACED so kitchen sees new items
         const newTotal = order.total_amount + additionalAmount;
-        await db.prepare('UPDATE orders SET total_amount = ? WHERE id = ?').run(newTotal, orderId);
+        const newInternalStatus = 'PLACED';
+        const newPublicStatus = 'Order placed';
+        await db.prepare(
+            'UPDATE orders SET total_amount = ?, internal_status = ?, public_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        ).run(newTotal, newInternalStatus, newPublicStatus, orderId);
 
         const updatedOrder = await getOrderById(orderId);
         orderEvents.emit('order-updated', {
             restaurant_id: table.restaurant_id,
             order_id: parseInt(orderId),
-            internal_status: order.internal_status,
+            internal_status: newInternalStatus,
             public_status: updatedOrder.public_status,
             table_number: updatedOrder.table_number
         });
