@@ -209,6 +209,9 @@
     }
 
     window.openCart = function () {
+        // Always reset the place-order button state when opening cart
+        const btn = document.getElementById('place-order-btn');
+        if (btn) { btn.disabled = false; }
         renderCartDrawer();
         document.getElementById('cart-overlay').classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -256,32 +259,38 @@
       </div>
     `).join('');
 
-        // Payment options
+        // Payment options — hide when adding items to an existing order
         const optionsContainer = document.getElementById('payment-options');
-        const info = state.tableInfo;
-        let options = '';
+        if (state.addingToOrderId) {
+            optionsContainer.innerHTML = '';
+        } else {
+            const info = state.tableInfo;
+            let options = '';
 
-        if (info.prepaid_enabled) {
-            options += `
-        <div class="payment-option ${state.paymentMode === 'PREPAID' ? 'selected' : ''}" onclick="selectPayment('PREPAID')">
-          <div class="payment-option-title">💳 Pay Now</div>
-          <div class="payment-option-desc">Pay online before cooking</div>
-        </div>
-      `;
+            if (info.prepaid_enabled) {
+                options += `
+            <div class="payment-option ${state.paymentMode === 'PREPAID' ? 'selected' : ''}" onclick="selectPayment('PREPAID')">
+              <div class="payment-option-title">💳 Pay Now</div>
+              <div class="payment-option-desc">Pay online before cooking</div>
+            </div>
+          `;
+            }
+            if (info.postpaid_enabled) {
+                options += `
+            <div class="payment-option ${state.paymentMode === 'POSTPAID' ? 'selected' : ''}" onclick="selectPayment('POSTPAID')">
+              <div class="payment-option-title">🍽️ Pay Later</div>
+              <div class="payment-option-desc">Pay after your meal</div>
+            </div>
+          `;
+            }
+            optionsContainer.innerHTML = options;
         }
-        if (info.postpaid_enabled) {
-            options += `
-        <div class="payment-option ${state.paymentMode === 'POSTPAID' ? 'selected' : ''}" onclick="selectPayment('POSTPAID')">
-          <div class="payment-option-title">🍽️ Pay Later</div>
-          <div class="payment-option-desc">Pay after your meal</div>
-        </div>
-      `;
-        }
-        optionsContainer.innerHTML = options;
 
-        // Update button text and re-enable it
+        // Update button text and ALWAYS re-enable it
         const btn = document.getElementById('place-order-btn');
         btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
         if (state.addingToOrderId) {
             btn.textContent = '🍽️ Add to Order';
         } else if (state.paymentMode === 'PREPAID') {
@@ -347,6 +356,7 @@
                 if (result.order_id) {
                     state.currentOrderId = result.order_id;
                     state.cart = [];
+                    btn.disabled = false;
                     updateCartUI();
                     closeCart();
                     showToast('Items added to your order!', 'success');
@@ -507,55 +517,29 @@
                     rzp.open();
                 }
             } else {
-                // POSTPAID: add to existing order OR create new order
-                let result;
-
-                if (state.addingToOrderId) {
-                    // Add items to existing POSTPAID order
-                    const resp = await fetch(`/api/orders/${state.addingToOrderId}/add-items`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            table_token: state.token,
-                            items
-                        })
-                    });
-                    result = await resp.json();
-                    if (result.order_id) {
-                        state.cart = [];
-                        updateCartUI();
-                        closeCart();
-                        showToast('Items added to your order!', 'success');
-                        await showTrackingView(result.order_id);
-                    } else {
-                        showToast(result.error || 'Failed to add items', 'error');
-                        btn.disabled = false;
-                        renderCartDrawer();
-                    }
+                // POSTPAID: create new order
+                const resp = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        table_token: state.token,
+                        items,
+                        payment_mode: 'POSTPAID'
+                    })
+                });
+                const result = await resp.json();
+                if (result.order_id) {
+                    state.currentOrderId = result.order_id;
+                    state.cart = [];
+                    btn.disabled = false;
+                    updateCartUI();
+                    closeCart();
+                    showToast('Order placed! We\'re getting it ready for you.', 'success');
+                    await showTrackingView(result.order_id);
                 } else {
-                    // Create new POSTPAID order
-                    const resp = await fetch('/api/orders', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            table_token: state.token,
-                            items,
-                            payment_mode: 'POSTPAID'
-                        })
-                    });
-                    result = await resp.json();
-                    if (result.order_id) {
-                        state.currentOrderId = result.order_id;
-                        state.cart = [];
-                        updateCartUI();
-                        closeCart();
-                        showToast('Order placed! We\'re getting it ready for you.', 'success');
-                        await showTrackingView(result.order_id);
-                    } else {
-                        showToast(result.error || 'Failed to place order', 'error');
-                        btn.disabled = false;
-                        renderCartDrawer();
-                    }
+                    showToast(result.error || 'Failed to place order', 'error');
+                    btn.disabled = false;
+                    renderCartDrawer();
                 }
             }
         } catch (err) {
